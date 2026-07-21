@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "\u8bbe\u7f6e",
+  "usingComponents": {
+    "sidebar-drawer": "/components/sidebar-drawer/sidebar-drawer"
+  }
+}

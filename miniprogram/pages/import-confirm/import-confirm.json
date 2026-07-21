@@ -1,0 +1,5 @@
+{
+  "usingComponents": {
+    "sidebar-drawer": "/components/sidebar-drawer/sidebar-drawer"
+  }
+}

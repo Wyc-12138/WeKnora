@@ -1,0 +1,45 @@
+<view class="chat-page">
+  <sidebar-drawer
+    active-key="chat"
+    title="WeKnora"
+    subtitle="{{sessionId ? 'Knowledge Chat' : 'New chat'}}"
+    bind:newchat="newSession"
+    bind:opensession="onOpenSession"
+  />
+
+  <scroll-view class="message-scroll" scroll-y="true" show-scrollbar="{{false}}" scroll-into-view="{{bottomAnchor}}" enhanced="true">
+    <view wx:if="{{historyLoading}}" class="empty">正在加载历史...</view>
+    <view wx:if="{{!messages.length && !historyLoading}}" class="welcome">
+      <view class="welcome-title">今天想查什么？</view>
+      <view class="welcome-desc">选择知识库后直接提问，WeKnora 会从你的知识库里检索并回答。</view>
+    </view>
+
+    <view wx:for="{{messages}}" wx:key="id" class="message-block {{item.role === 'user' ? 'user-message' : 'assistant-message'}}">
+      <view wx:if="{{item.role === 'user'}}" class="user-bubble">{{item.content}}</view>
+      <view wx:else class="assistant-text">
+        <rich-text wx:if="{{item.markdownNodes && item.markdownNodes.length}}" nodes="{{item.markdownNodes}}" />
+        <text wx:else>{{item.content || (loading ? "正在生成..." : "")}}</text>
+      </view>
+    </view>
+
+    <view id="{{bottomAnchor}}" class="bottom-anchor"></view>
+  </scroll-view>
+
+  <view class="composer-wrap">
+    <!-- <view class="disclaimer">WeKnora may make mistakes. Please double-check responses.</view> -->
+    <view class="composer">
+      <button class="composer-tool" bindtap="openKnowledge">+</button>
+      <textarea
+        class="composer-input"
+        value="{{query}}"
+        auto-height="true"
+        maxlength="-1"
+        placeholder="Ask WeKnora"
+        bindinput="onQueryInput"
+      />
+      <button class="send-button" bindtap="ask" loading="{{loading}}" disabled="{{!query || loading}}">↑</button>
+    </view>
+    
+  </view>
+  <bottom-nav active="chat" />
+</view>

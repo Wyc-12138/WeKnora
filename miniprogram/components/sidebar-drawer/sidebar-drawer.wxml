@@ -1,0 +1,71 @@
+<view class="shell-topbar" style="padding-top: {{statusBarHeight}}px">
+  <button class="round-button menu-icon" hover-class="button-hover" bindtap="openDrawer" aria-label="打开菜单">
+    <view class="hamburger-line"></view>
+    <view class="hamburger-line"></view>
+  </button>
+  <view class="topbar-title">
+    <view class="model-title">{{title}}</view>
+    <view wx:if="{{subtitle}}" class="model-subtitle">{{subtitle}}</view>
+  </view>
+  <button wx:if="{{showNew}}" class="round-button" hover-class="button-hover" bindtap="newChat" aria-label="新建会话">＋</button>
+  <view wx:else class="round-spacer"></view>
+</view>
+
+<view class="drawer-layer {{drawerVisible ? 'mounted' : ''}} {{open ? 'open' : ''}}" catchtouchmove="stopPropagation">
+  <view class="drawer-mask" bindtap="closeDrawer"></view>
+  <view class="drawer-panel" catchtap="stopPropagation">
+    <view class="drawer-main">
+      <view class="drawer-brand">
+        <view class="brand-mark">W</view>
+        <view class="brand-name">WeKnora</view>
+      </view>
+
+      <button class="new-chat" hover-class="button-hover" bindtap="newChat">新聊天</button>
+
+      <view class="search-box">
+        <text class="search-icon">⌕</text>
+        <input class="search-input" value="{{sessionKeyword}}" placeholder="搜索会话" bindinput="onSearchInput" />
+      </view>
+
+      <scroll-view class="session-scroll" scroll-y="true" enhanced="true">
+        <view wx:if="{{sessionLoading}}" class="drawer-empty">正在加载...</view>
+        <view wx:if="{{!sessionLoading && !sessions.length}}" class="drawer-empty">暂无会话</view>
+        <view
+          wx:for="{{sessions}}"
+          wx:key="id"
+          class="session-row"
+          data-id="{{item.id}}"
+          bindtap="openSession"
+        >
+          <view class="session-text">{{item.displayTitle}}</view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <view class="drawer-footer">
+      <view class="footer-account">
+        <image wx:if="{{accountAvatar}}" class="account-avatar" src="{{accountAvatar}}" mode="aspectFill" />
+        <view wx:else class="account-avatar account-avatar-fallback">{{accountInitial}}</view>
+        <text class="account-name">{{accountName}}</text>
+      </view>
+      <view class="footer-actions">
+        <button
+          class="footer-icon-button {{activeKey === 'settings' ? 'active' : ''}}"
+          hover-class="button-hover"
+          bindtap="goSettings"
+          aria-label="设置"
+        >
+          <text class="footer-action-icon">⚙</text>
+        </button>
+        <button
+          class="footer-icon-button {{activeKey === 'knowledge' ? 'active' : ''}}"
+          hover-class="button-hover"
+          bindtap="goKnowledge"
+          aria-label="知识库"
+        >
+          <text class="footer-action-icon">📖</text>
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

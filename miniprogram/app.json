@@ -1,0 +1,84 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/clip-article/clip-article",
+    "pages/article-confirm/article-confirm",
+    "pages/upload-confirm/upload-confirm",
+    "pages/chat/chat",
+    "pages/import-confirm/import-confirm",
+    "pages/knowledge-detail/knowledge-detail",
+    "pages/settings/settings"
+  ],
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/bottom-nav"
+  },
+  "supportedMaterials": [
+    {
+      "materialType": "text/html",
+      "name": "用${nickname}导入",
+      "desc": "导入公众号文章或网页链接",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/*",
+      "name": "用${nickname}导入",
+      "desc": "上传通用文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "text/plain",
+      "name": "用${nickname}导入",
+      "desc": "上传文本文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/pdf",
+      "name": "用${nickname}导入",
+      "desc": "上传 PDF 文档到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/msword",
+      "name": "用${nickname}导入",
+      "desc": "上传 Word 文档到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "name": "用${nickname}导入",
+      "desc": "上传 Word 文档到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/vnd.ms-excel",
+      "name": "用${nickname}导入",
+      "desc": "上传 Excel 文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "name": "用${nickname}导入",
+      "desc": "上传 Excel 文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/vnd.ms-powerpoint",
+      "name": "用${nickname}导入",
+      "desc": "上传 PPT 文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    },
+    {
+      "materialType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "name": "用${nickname}导入",
+      "desc": "上传 PPT 文件到知识库",
+      "path": "pages/import-confirm/import-confirm"
+    }
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "navigationBarTitleText": "WeKnora",
+    "navigationBarBackgroundColor": "#fbf9f4",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#fbf9f4"
+  }
+}

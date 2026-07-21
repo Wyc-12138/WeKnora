@@ -1,0 +1,53 @@
+<view class="page confirm-page with-bottom-nav">
+  <view class="mp-topbar">
+    <button class="mp-back" bindtap="goBack">‹</button>
+    <view class="mp-page-title">确认文章</view>
+    <view class="mp-more">•••</view>
+  </view>
+
+  <view class="success-banner">✓ 文章识别成功</view>
+
+  <view class="article-card">
+    <image wx:if="{{preview.cover_url}}" class="article-cover" src="{{preview.cover_url}}" mode="aspectFill" />
+    <view wx:else class="article-cover fallback-cover">
+      <view>消化内镜诊疗</view>
+      <text>2026版</text>
+    </view>
+    <view class="article-info">
+      <view class="article-title">{{preview.title || "微信文章"}}</view>
+      <view class="article-source">{{preview.source || "微信公众号"}}</view>
+      <view class="article-date">{{preview.published_at || "日期待确认"}}</view>
+      <view class="article-summary">{{preview.summary || "文章链接已识别，请确认后提交草稿。"}}</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-row">
+      <view class="row-icon">▤</view>
+      <view class="row-label">资料名称</view>
+      <input class="row-input" value="{{title}}" placeholder="填写资料名称" bindinput="onTitleInput" />
+    </view>
+    <picker range="{{knowledgeBaseNames}}" value="{{selectedIndex}}" bindchange="onKnowledgeBaseChange">
+      <view class="form-row">
+        <view class="row-icon">▣</view>
+        <view class="row-label">目标知识库</view>
+        <view class="row-value">{{selectedKnowledgeBaseName || "选择知识库"}}</view>
+        <view class="row-arrow">›</view>
+      </view>
+    </picker>
+    <view class="form-row">
+      <view class="row-icon">◇</view>
+      <view class="row-label">资料类型</view>
+      <input class="row-input" value="{{materialType}}" placeholder="指南 / 共识解读" bindinput="onMaterialTypeInput" />
+    </view>
+    <view class="note-block">
+      <view class="note-label">备注（选填）</view>
+      <textarea value="{{note}}" maxlength="200" placeholder="补充推荐理由或使用范围" bindinput="onNoteInput" />
+      <view class="count">{{note.length}}/200</view>
+    </view>
+  </view>
+
+  <view class="rule-card">i 提交后进入草稿，由桌面管理员审核；发布成功后才参与问答。</view>
+  <button class="primary-button submit-button" bindtap="submitDraft" loading="{{submitting}}" disabled="{{submitting || !title || !selectedKnowledgeBaseId}}">提交草稿</button>
+  <bottom-nav active="collect" />
+</view>

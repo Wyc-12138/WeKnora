@@ -1,0 +1,82 @@
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 112rpx;
+  padding: 16rpx 38rpx calc(18rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #e5eaf2;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -10rpx 30rpx rgba(16, 24, 40, 0.06);
+  box-sizing: border-box;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  color: #8a94a6;
+  font-size: 26rpx;
+  line-height: 1;
+}
+
+.nav-item.active {
+  color: #075be8;
+  font-weight: 800;
+}
+
+.nav-icon {
+  position: relative;
+  width: 42rpx;
+  height: 42rpx;
+  box-sizing: border-box;
+}
+
+.collect-icon {
+  width: 42rpx;
+  height: 28rpx;
+  margin-top: 4rpx;
+  border-radius: 4rpx;
+  background: currentColor;
+  transform: skewX(-10deg);
+}
+
+.qa-icon {
+  width: 24rpx;
+  height: 24rpx;
+  margin-top: 4rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.mine-icon::before,
+.mine-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 3rpx solid currentColor;
+}
+
+.mine-icon::before {
+  top: 4rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+}
+
+.mine-icon::after {
+  bottom: 4rpx;
+  width: 28rpx;
+  height: 18rpx;
+  border-radius: 18rpx 18rpx 4rpx 4rpx;
+}
+
+.nav-label {
+  min-height: 28rpx;
+}

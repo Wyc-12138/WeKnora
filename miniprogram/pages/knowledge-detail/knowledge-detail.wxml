@@ -1,0 +1,61 @@
+<view class="page with-bottom-nav">
+  <sidebar-drawer active-key="knowledge" title="知识库详情" subtitle="Files" />
+
+  <view class="content">
+    <view class="detail-head">
+      <view class="title">{{knowledgeBase.name || "知识库"}}</view>
+      <view class="muted">{{knowledgeBase.description || "暂无描述"}}</view>
+    </view>
+
+    <view class="meta-grid">
+      <view class="meta-item">
+        <text class="meta-label">类型</text>
+        <text>{{knowledgeBase.type || "document"}}</text>
+      </view>
+      <view class="meta-item">
+        <text class="meta-label">文档数</text>
+        <text>{{total}}</text>
+      </view>
+      <view class="meta-item">
+        <text class="meta-label">向量库</text>
+        <text>{{knowledgeBase.vector_store_name || knowledgeBase.vector_store_engine_type || "默认"}}</text>
+      </view>
+      <view class="meta-item">
+        <text class="meta-label">更新时间</text>
+        <text>{{knowledgeBase.timeText || "-"}}</text>
+      </view>
+    </view>
+
+    <button class="upload-button" bindtap="chooseAndUpload" loading="{{uploading}}" disabled="{{uploading}}">
+      从微信聊天记录选择文件
+    </button>
+
+    <view wx:if="{{uploadErrors.length}}" class="error">
+      <view wx:for="{{uploadErrors}}" wx:key="*this">{{item}}</view>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <view class="subtitle">知识文件</view>
+        <view class="muted">查看文件名和解析状态</view>
+      </view>
+      <button class="small-button" bindtap="loadAll" loading="{{loading}}">刷新</button>
+    </view>
+
+    <view wx:if="{{!files.length && !loading}}" class="empty">暂无知识文件</view>
+
+    <view wx:for="{{files}}" wx:key="id" class="file-item">
+      <view class="file-title">{{item.displayTitle}}</view>
+      <view class="file-meta">
+        <text>{{item.displayType}}</text>
+        <text wx:if="{{item.statusText}}"> · {{item.statusText}}</text>
+        <text wx:if="{{item.sizeText}}"> · {{item.sizeText}}</text>
+      </view>
+      <view wx:if="{{item.timeText}}" class="file-time">{{item.timeText}}</view>
+      <view wx:if="{{item.displayError}}" class="error">{{item.displayError}}</view>
+    </view>
+
+    <button wx:if="{{hasMore}}" class="load-more" bindtap="loadMore" loading="{{loading}}">加载更多</button>
+  </view>
+  <bottom-nav active="collect" />
+</view>

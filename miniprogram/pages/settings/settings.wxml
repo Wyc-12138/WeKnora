@@ -1,0 +1,23 @@
+<view class="page with-bottom-nav">
+  <sidebar-drawer active-key="settings" title="设置" subtitle="Connection" />
+
+  <view class="content">
+    <view class="settings-head">
+      <view class="title">设置</view>
+      <view class="muted">填写 API 地址和租户 API Key。</view>
+    </view>
+
+    <view class="field">
+      <text class="label">API Base URL</text>
+      <input value="{{baseUrl}}" placeholder="https://your-weknora.example.com" bindinput="onBaseUrlInput" />
+    </view>
+
+    <view class="field">
+      <text class="label">API Key</text>
+      <input value="{{apiKey}}" password placeholder="sk-..." bindinput="onApiKeyInput" />
+    </view>
+
+    <button bindtap="save">保存设置</button>
+  </view>
+  <bottom-nav active="mine" />
+</view>

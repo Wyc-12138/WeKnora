@@ -1,0 +1,85 @@
+.detail-head {
+  margin-bottom: 28rpx;
+}
+
+.detail-head .muted {
+  margin-top: 10rpx;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.meta-item {
+  min-width: 0;
+  padding: 20rpx;
+  border: 1rpx solid rgba(34, 31, 28, 0.08);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.78);
+  color: #2a2723;
+  font-size: 25rpx;
+}
+
+.meta-label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #827a70;
+  font-size: 22rpx;
+}
+
+.upload-button {
+  margin: 28rpx 0 40rpx;
+  background: #26231f;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 14rpx;
+}
+
+.small-button {
+  flex: 0 0 auto;
+  min-width: 116rpx;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #292622;
+  border: 1rpx solid rgba(34, 31, 28, 0.09);
+}
+
+.file-item {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid rgba(34, 31, 28, 0.08);
+}
+
+.file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #211f1c;
+  font-size: 30rpx;
+  font-weight: 680;
+}
+
+.file-meta,
+.file-time {
+  margin-top: 8rpx;
+  color: #847c72;
+  font-size: 23rpx;
+}
+
+.error {
+  margin-top: 10rpx;
+  color: #ba3f2d;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+
+.load-more {
+  margin-top: 32rpx;
+}

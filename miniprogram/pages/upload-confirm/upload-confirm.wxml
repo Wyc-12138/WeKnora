@@ -1,0 +1,49 @@
+<view class="page upload-page with-bottom-nav">
+  <view class="mp-topbar">
+    <button class="mp-back" bindtap="goBack">‹</button>
+    <view class="mp-page-title">上传文件</view>
+    <view class="mp-more">•••</view>
+  </view>
+
+  <view class="screen-title">确认上传资料</view>
+  <view class="screen-desc">文件将先进入草稿，由桌面管理员审核发布</view>
+
+  <view class="file-card" bindtap="chooseFile">
+    <view class="file-badge">{{fileBadge}}</view>
+    <view class="file-info">
+      <view class="file-name">{{file.name || "从微信选择 PDF / Word"}}</view>
+      <view class="file-meta">{{fileMeta}}</view>
+      <view class="selected-text">{{file.path ? "已选择" : "未选择"}}</view>
+    </view>
+    <view class="choose-again">{{file.path ? "重新选择" : "选择文件"}}</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-row">
+      <view class="row-label">资料名称</view>
+      <input class="row-input" value="{{title}}" placeholder="填写资料名称" bindinput="onTitleInput" />
+    </view>
+    <picker range="{{knowledgeBaseNames}}" value="{{selectedIndex}}" bindchange="onKnowledgeBaseChange">
+      <view class="form-row">
+        <view class="row-label">目标知识库</view>
+        <view class="row-value">{{selectedKnowledgeBaseName || "选择知识库"}}</view>
+        <view class="row-arrow">›</view>
+      </view>
+    </picker>
+    <view class="form-row">
+      <view class="row-label">资料类型</view>
+      <input class="row-input" value="{{materialType}}" placeholder="指南 / 共识" bindinput="onMaterialTypeInput" />
+    </view>
+    <view class="note-block">
+      <view class="note-label">备注（选填）</view>
+      <textarea value="{{note}}" maxlength="200" placeholder="补充资料用途或审核说明" bindinput="onNoteInput" />
+      <view class="count">{{note.length}}/200</view>
+    </view>
+  </view>
+
+  <view class="privacy-card">△ 请勿上传包含患者姓名、住院号等隐私信息的资料</view>
+  <view class="rule-card">盾 审核发布后才参与知识问答，管理员将在桌面管理端完成审核</view>
+
+  <button class="primary-button submit-button" bindtap="submitDraft" loading="{{submitting}}" disabled="{{submitting || !file.path || !title || !selectedKnowledgeBaseId}}">上传并提交草稿</button>
+  <bottom-nav active="collect" />
+</view>

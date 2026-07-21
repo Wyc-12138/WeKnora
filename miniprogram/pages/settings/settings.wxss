@@ -1,0 +1,7 @@
+.settings-head {
+  margin-bottom: 38rpx;
+}
+
+.settings-head .muted {
+  margin-top: 10rpx;
+}

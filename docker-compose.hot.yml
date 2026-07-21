@@ -1,0 +1,24 @@
+services:
+  app:
+    image: weknora-app-hot:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app-hot
+      args:
+        GOPRIVATE_ARG: ${GOPRIVATE_ARG:-}
+        GOPROXY_ARG: ${GOPROXY_ARG:-https://goproxy.cn,direct}
+        GOSUMDB_ARG: ${GOSUMDB_ARG:-off}
+        APK_MIRROR_ARG: ${APK_MIRROR_ARG:-}
+    working_dir: /app
+    entrypoint: []
+    command: ["air", "-c", ".air.toml"]
+    environment:
+      GIN_MODE: debug
+    volumes:
+      - ./:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+volumes:
+  go-mod-cache:
+  go-build-cache:

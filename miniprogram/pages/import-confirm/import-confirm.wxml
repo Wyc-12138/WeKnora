@@ -1,0 +1,41 @@
+<view class="page with-bottom-nav">
+  <sidebar-drawer active-key="knowledge" title="微信导入" subtitle="Import" />
+
+  <view class="content">
+    <view wx:if="{{needsSettings}}" class="notice">
+      <view>请先配置 WeKnora API Base URL 和 API Key。</view>
+      <button class="ghost-button notice-button" bindtap="openSettings">打开设置</button>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <view class="subtitle">确认导入内容</view>
+        <view class="muted">{{statusMessage || "选择目标知识库后开始上传或导入链接"}}</view>
+      </view>
+      <button class="small-button" bindtap="loadKnowledgeBases" loading="{{loading}}" disabled="{{needsSettings}}">刷新</button>
+    </view>
+
+    <picker range="{{knowledgeBaseNames}}" value="{{selectedIndex}}" bindchange="onKnowledgeBaseChange" disabled="{{!knowledgeBaseNames.length || importing}}">
+      <view class="picker-value">{{selectedKnowledgeBaseName || "选择目标知识库"}}</view>
+    </picker>
+
+    <view class="material-list">
+      <view wx:for="{{materials}}" wx:key="displayTitle" class="material-item">
+        <view class="material-type">{{item.displayType}}</view>
+        <view class="material-title">{{item.displayTitle}}</view>
+        <view wx:if="{{item.displayMeta}}" class="material-meta">{{item.displayMeta}}</view>
+        <view wx:if="{{item.needsUrl}}" class="url-panel">
+          <view class="muted">如果微信没有传入公众号文章链接，请在这里粘贴这篇文章的 URL。</view>
+          <input class="url-input" data-index="{{index}}" value="{{articleUrls[index]}}" placeholder="https://mp.weixin.qq.com/..." bindinput="onArticleUrlInput" />
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{errorMessage}}" class="error">{{errorMessage}}</view>
+
+    <button class="import-button" bindtap="confirmImport" loading="{{importing}}" disabled="{{needsSettings || importing || !selectedKnowledgeBaseId || !materials.length}}">
+      确认导入
+    </button>
+  </view>
+  <bottom-nav active="collect" />
+</view>

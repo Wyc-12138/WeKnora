@@ -1,0 +1,153 @@
+.chat-page {
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: #f7fbff;
+  padding-bottom: calc(340rpx + env(safe-area-inset-bottom));
+}
+
+.chat-page ::-webkit-scrollbar,
+.message-scroll ::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.message-scroll {
+  box-sizing: border-box;
+  height: calc(100vh - 470rpx - env(safe-area-inset-bottom));
+  overflow: hidden;
+  padding: 18rpx 34rpx 40rpx;
+}
+
+.welcome {
+  padding: 120rpx 22rpx 60rpx;
+  text-align: center;
+}
+
+.welcome-title {
+  color: #211f1c;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 48rpx;
+  font-weight: 600;
+}
+
+.welcome-desc {
+  max-width: 560rpx;
+  margin: 18rpx auto 0;
+  color: #766f66;
+  font-size: 27rpx;
+  line-height: 1.55;
+}
+
+.message-block {
+  margin: 32rpx 0;
+}
+
+.user-message {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.user-bubble {
+  max-width: 82%;
+  box-sizing: border-box;
+  padding: 22rpx 26rpx;
+  border-radius: 28rpx;
+  background: #eeeae3;
+  color: #26231f;
+  font-size: 30rpx;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.assistant-message {
+  color: #211f1c;
+}
+
+.assistant-text {
+  color: #211f1c;
+  font-size: 31rpx;
+  line-height: 1.78;
+  word-break: break-word;
+}
+
+.assistant-placeholder {
+  color: #7a736a;
+}
+
+.bottom-anchor {
+  height: 1rpx;
+}
+
+.composer-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(128rpx + env(safe-area-inset-bottom));
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10rpx 28rpx 16rpx;
+  background: linear-gradient(180deg, rgba(247, 251, 255, 0), #f7fbff 22%);
+}
+
+.disclaimer {
+  margin: 0 18rpx 14rpx;
+  color: #6f6860;
+  font-size: 22rpx;
+  text-align: right;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 14rpx;
+  box-sizing: border-box;
+  min-height: 118rpx;
+  padding: 22rpx;
+  border-radius: 34rpx;
+  background: #ffffff;
+  box-shadow: 0 18rpx 52rpx rgba(36, 32, 28, 0.13);
+}
+
+.composer-tool,
+.send-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 64rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 38rpx;
+  line-height: 64rpx;
+}
+
+.composer-tool {
+  background: transparent;
+  color: #26231f;
+}
+
+.send-button {
+  background: #26231f;
+  color: #ffffff;
+}
+
+.composer-input {
+  flex: 1;
+  min-height: 64rpx;
+  max-height: 190rpx;
+  padding: 10rpx 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #26231f;
+  font-size: 30rpx;
+  line-height: 1.45;
+}
+
+.empty {
+  padding-top: 180rpx;
+}

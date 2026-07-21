@@ -1,0 +1,3 @@
+-- Compatibility migration for databases already advanced past the original
+-- mobile_submissions migration number. Keep rollback non-destructive because
+-- older local migration histories may have created this table at version 68.

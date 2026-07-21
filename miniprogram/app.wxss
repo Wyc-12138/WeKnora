@@ -1,0 +1,179 @@
+page {
+  min-height: 100%;
+  background: #f7fbff;
+  color: #101114;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: #f7fbff;
+  padding: 0 32rpx 40rpx;
+}
+
+.page.with-bottom-nav {
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+}
+
+.content {
+  padding-top: 18rpx;
+}
+
+.card {
+  box-sizing: border-box;
+  padding: 28rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid #e3e8f0;
+  box-shadow: 0 18rpx 52rpx rgba(7, 91, 232, 0.08);
+}
+
+.title {
+  color: #101114;
+  font-size: 38rpx;
+  font-weight: 720;
+  line-height: 1.18;
+}
+
+.subtitle {
+  color: #101114;
+  font-size: 31rpx;
+  font-weight: 700;
+}
+
+.muted {
+  color: #667085;
+  font-size: 25rpx;
+  line-height: 1.45;
+}
+
+.field {
+  margin-top: 26rpx;
+}
+
+.label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #101114;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+input,
+textarea,
+picker {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 88rpx;
+  padding: 20rpx 24rpx;
+  border: 1rpx solid #dbe6f4;
+  border-radius: 24rpx;
+  background: #ffffff;
+  color: #101114;
+  font-size: 28rpx;
+}
+
+textarea {
+  min-height: 150rpx;
+}
+
+button {
+  margin-top: 24rpx;
+  border-radius: 24rpx;
+  background: #075be8;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+button::after {
+  border: 0;
+}
+
+button[disabled] {
+  background: #d8e3f2;
+  color: #8a94a6;
+}
+
+.ghost-button {
+  background: #ffffff;
+  color: #075be8;
+  border: 1rpx solid #cfe0ff;
+  box-shadow: 0 10rpx 28rpx rgba(7, 91, 232, 0.06);
+}
+
+.empty {
+  padding: 42rpx 0;
+  color: #8a837a;
+  text-align: center;
+  font-size: 26rpx;
+}
+
+.mp-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 104rpx;
+  padding-top: 36rpx;
+}
+
+.mp-page-title {
+  color: #101114;
+  font-size: 36rpx;
+  font-weight: 800;
+}
+
+.mp-back,
+.mp-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 36rpx;
+  background: transparent;
+  color: #101114;
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.primary-button {
+  min-height: 104rpx;
+  border-radius: 24rpx;
+  background: #075be8;
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 800;
+  box-shadow: 0 18rpx 36rpx rgba(7, 91, 232, 0.22);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.status-pending_review,
+.status-processing {
+  background: #fff1df;
+  color: #ef7d00;
+}
+
+.status-published {
+  background: #e8f7ed;
+  color: #22a447;
+}
+
+.status-rejected,
+.status-failed,
+.status-withdrawn {
+  background: #feeceb;
+  color: #e73b36;
+}

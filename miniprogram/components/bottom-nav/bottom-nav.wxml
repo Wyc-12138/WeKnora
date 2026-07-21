@@ -1,0 +1,14 @@
+<view class="bottom-nav">
+  <view class="nav-item {{active === 'collect' ? 'active' : ''}}" data-target="collect" bindtap="switchTab">
+    <view class="nav-icon collect-icon"></view>
+    <view class="nav-label">采集</view>
+  </view>
+  <view class="nav-item {{active === 'chat' ? 'active' : ''}}" data-target="chat" bindtap="switchTab">
+    <view class="nav-icon qa-icon"></view>
+    <view class="nav-label">问答</view>
+  </view>
+  <view class="nav-item {{active === 'mine' ? 'active' : ''}}" data-target="mine" bindtap="switchTab">
+    <view class="nav-icon mine-icon"></view>
+    <view class="nav-label">我的</view>
+  </view>
+</view>

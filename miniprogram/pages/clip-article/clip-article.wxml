@@ -1,0 +1,53 @@
+<view class="page clip-page with-bottom-nav">
+  <view class="mp-topbar">
+    <button class="mp-back" bindtap="goBack">‹</button>
+    <view class="mp-page-title">剪藏文章</view>
+    <view class="mp-more">•••</view>
+  </view>
+
+  <view class="screen-title">粘贴公众号文章链接</view>
+  <view class="screen-desc">在文章右上角选择复制链接，再回到这里读取</view>
+
+  <view class="steps-card">
+    <view class="step">
+      <view class="step-icon">🔗</view>
+      <view class="step-index">1</view>
+      <view>复制文章链接</view>
+    </view>
+    <view class="step-arrow">›</view>
+    <view class="step">
+      <view class="step-icon">⇧</view>
+      <view class="step-index">2</view>
+      <view>读取剪贴板</view>
+    </view>
+    <view class="step-arrow">›</view>
+    <view class="step">
+      <view class="step-icon">✓</view>
+      <view class="step-index">3</view>
+      <view>确认后提交</view>
+    </view>
+  </view>
+
+  <view class="field-title">文章链接</view>
+  <view class="url-box">
+    <textarea value="{{url}}" maxlength="-1" placeholder="https://mp.weixin.qq.com/..." bindinput="onUrlInput" />
+    <button wx:if="{{url}}" class="clear-url" bindtap="clearUrl">×</button>
+  </view>
+
+  <button class="primary-button clipboard-button" bindtap="readClipboard" loading="{{readingClipboard}}">读取剪贴板</button>
+  <view class="privacy-note">盾 仅在你点击后读取剪贴板内容</view>
+
+  <view class="recent-title">最近识别</view>
+  <view wx:if="{{!recent.length}}" class="empty-card">暂无最近识别记录</view>
+  <view wx:for="{{recent}}" wx:key="url" class="recent-card" data-url="{{item.url}}" bindtap="useRecent">
+    <view class="recent-icon">▤</view>
+    <view class="recent-main">
+      <view class="recent-name">{{item.title}}</view>
+      <view class="recent-date">{{item.date}}</view>
+    </view>
+    <view class="recent-arrow">›</view>
+  </view>
+
+  <button class="primary-button identify-button" bindtap="identifyArticle" loading="{{identifying}}" disabled="{{!url || identifying}}">识别文章</button>
+  <bottom-nav active="collect" />
+</view>
