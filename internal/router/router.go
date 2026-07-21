@@ -49,7 +49,6 @@ type RouterParams struct {
 	AgentShareService            interfaces.AgentShareService
 	KBHandler                    *handler.KnowledgeBaseHandler
 	KnowledgeHandler             *handler.KnowledgeHandler
-	MobileSubmissionHandler      *handler.MobileSubmissionHandler
 	TenantHandler                *handler.TenantHandler
 	TenantService                interfaces.TenantService
 	TenantAPIKeyService          interfaces.TenantAPIKeyService
@@ -221,7 +220,6 @@ func NewRouter(params RouterParams) *gin.Engine {
 		serveKBScopedFiles(v1, rbacGuards, params.TenantService, params.FileService)
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
-		RegisterMobileSubmissionRoutes(v1, params.MobileSubmissionHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
 		RegisterSessionRoutes(v1, params.SessionHandler, params.MessageSuggestionHandler, rbacGuards)
@@ -355,27 +353,6 @@ func RegisterKnowledgeRoutes(r *gin.RouterGroup, handler *handler.KnowledgeHandl
 		kgrp.POST("/batch-reparse", g.Contributor(), handler.BatchReparseKnowledge)
 		kgrp.POST("/batch-delete", g.Contributor(), handler.BatchDeleteKnowledge)
 		kgrp.POST("/move", g.Contributor(), handler.MoveKnowledge)
-	}
-}
-
-// RegisterMobileSubmissionRoutes wires mobile draft submissions. Submissions
-// are pre-knowledge review records and do not enter retrieval until a later
-// approval flow creates formal knowledge rows.
-func RegisterMobileSubmissionRoutes(r *gin.RouterGroup, handler *handler.MobileSubmissionHandler, g *rbacGuards) {
-	if handler == nil {
-		return
-	}
-
-	kb := g.apiKeyGroup(r.Group("/knowledge-bases/:id/mobile-submissions"), apiKeyIngest(apiKeyFullAccess()))
-	{
-		kb.POST("/article/preview", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.PreviewArticle)
-		kb.POST("/article", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.CreateArticleSubmission)
-		kb.POST("/file", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.CreateFileSubmission)
-	}
-
-	list := g.apiKeyGroup(r.Group("/mobile-submissions"), apiKeyRetrieve(apiKeyFullAccess()))
-	{
-		list.GET("", g.Viewer(), handler.ListSubmissions)
 	}
 }
 

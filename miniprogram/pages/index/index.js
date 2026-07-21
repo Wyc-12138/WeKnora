@@ -1,15 +1,6 @@
 const { saveSettings, getSettings } = require("../../utils/config");
-const { listKnowledgeBases, listMobileSubmissions } = require("../../utils/request");
-const { formatTime, normalizeList, unwrapData } = require("../../utils/normalize");
-
-const STATUS_TEXT = {
-  processing: "处理中",
-  pending_review: "待审核",
-  published: "已发布",
-  rejected: "已驳回",
-  failed: "失败",
-  withdrawn: "已撤回"
-};
+const { listKnowledgeBases } = require("../../utils/request");
+const { formatTime, normalizeList } = require("../../utils/normalize");
 
 function normalizeKnowledgeBases(response) {
   return normalizeList(response).map((item) => ({
@@ -18,33 +9,15 @@ function normalizeKnowledgeBases(response) {
   }));
 }
 
-function normalizeSubmissions(response) {
-  const payload = unwrapData(response);
-  const list = Array.isArray(payload?.data) ? payload.data : normalizeList(response);
-  return list.map((item) => {
-    const fileType = String(item.file_type || "").toUpperCase();
-    return {
-      ...item,
-      displayTitle: item.title || item.file_name || item.source_url || "未命名资料",
-      kindText: item.kind === "file" ? "文件" : "公众号",
-      fileBadge: fileType || "DOC",
-      statusText: STATUS_TEXT[item.status] || item.status || "处理中",
-      timeText: formatTime(item.created_at || item.updated_at) || "刚刚"
-    };
-  });
-}
-
 Page({
   data: {
     knowledgeBases: [],
     knowledgeBaseNames: [],
     loading: false,
     needsSettings: false,
-    recentSubmissions: [],
     selectedIndex: 0,
     selectedKnowledgeBaseId: "",
-    selectedKnowledgeBaseName: "",
-    submissionsLoading: false
+    selectedKnowledgeBaseName: ""
   },
 
   onShow() {
@@ -53,7 +26,6 @@ Page({
     this.setData({ needsSettings });
     if (!needsSettings) {
       this.loadKnowledgeBases();
-      this.loadRecentSubmissions();
     }
   },
 
@@ -96,18 +68,6 @@ Page({
       wx.showModal({ title: "加载知识库失败", content: error.message, showCancel: false });
     } finally {
       this.setData({ loading: false });
-    }
-  },
-
-  async loadRecentSubmissions() {
-    this.setData({ submissionsLoading: true });
-    try {
-      const response = await listMobileSubmissions({ page: 1, page_size: 5 });
-      this.setData({ recentSubmissions: normalizeSubmissions(response) });
-    } catch (error) {
-      this.setData({ recentSubmissions: [] });
-    } finally {
-      this.setData({ submissionsLoading: false });
     }
   },
 

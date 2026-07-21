@@ -2,11 +2,11 @@
   <view class="mp-topbar">
     <button class="mp-back" bindtap="goBack">‹</button>
     <view class="mp-page-title">上传文件</view>
-    <view class="mp-more">•••</view>
+    <view class="mp-topbar-spacer"></view>
   </view>
 
   <view class="screen-title">确认上传资料</view>
-  <view class="screen-desc">文件将先进入草稿，由桌面管理员审核发布</view>
+  <view class="screen-desc">文件将直接进入知识库处理流程</view>
 
   <view class="file-card" bindtap="chooseFile">
     <view class="file-badge">{{fileBadge}}</view>
@@ -42,8 +42,8 @@
   </view>
 
   <view class="privacy-card">△ 请勿上传包含患者姓名、住院号等隐私信息的资料</view>
-  <view class="rule-card">盾 审核发布后才参与知识问答，管理员将在桌面管理端完成审核</view>
+  <view class="rule-card">盾 处理完成后即可参与知识问答</view>
 
-  <button class="primary-button submit-button" bindtap="submitDraft" loading="{{submitting}}" disabled="{{submitting || !file.path || !title || !selectedKnowledgeBaseId}}">上传并提交草稿</button>
+  <button class="primary-button submit-button" bindtap="submitKnowledge" loading="{{submitting}}" disabled="{{submitting || !file.path || !title || !selectedKnowledgeBaseId}}">上传到知识库</button>
   <bottom-nav active="collect" />
 </view>

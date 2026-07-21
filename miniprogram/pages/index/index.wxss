@@ -27,19 +27,6 @@
   font-size: 30rpx;
 }
 
-.mini-menu {
-  width: 172rpx;
-  height: 72rpx;
-  min-height: 72rpx;
-  margin: 0;
-  padding: 0;
-  border: 1rpx solid #dce3ee;
-  border-radius: 999rpx;
-  background: #ffffff;
-  color: #101114;
-  font-size: 34rpx;
-}
-
 .notice-card {
   margin-bottom: 24rpx;
   padding: 24rpx;
@@ -158,85 +145,4 @@
   bottom: 28rpx;
   color: #075be8;
   font-size: 52rpx;
-}
-
-.section-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 48rpx 0 20rpx;
-}
-
-.section-title {
-  color: #101114;
-  font-size: 34rpx;
-  font-weight: 820;
-}
-
-.link-button {
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  color: #075be8;
-  font-size: 28rpx;
-}
-
-.empty-state {
-  padding: 34rpx;
-  border-radius: 24rpx;
-  background: #ffffff;
-  color: #667085;
-  text-align: center;
-}
-
-.submission-row {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  min-height: 128rpx;
-  margin-bottom: 20rpx;
-  padding: 24rpx;
-  border: 1rpx solid #e3e8f0;
-  border-radius: 26rpx;
-  background: #ffffff;
-}
-
-.submission-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 86rpx;
-  height: 86rpx;
-  border-radius: 22rpx;
-  background: #eef5ff;
-  color: #075be8;
-  font-size: 32rpx;
-  font-weight: 800;
-}
-
-.submission-main {
-  min-width: 0;
-  flex: 1;
-}
-
-.submission-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #101114;
-  font-size: 30rpx;
-  font-weight: 760;
-}
-
-.submission-meta {
-  margin-top: 8rpx;
-  color: #667085;
-  font-size: 25rpx;
-}
-
-.row-arrow {
-  color: #a0a9b8;
-  font-size: 42rpx;
 }

@@ -6,7 +6,6 @@
         <view class="kb-select">{{selectedKnowledgeBaseName || "选择知识库"}}⌄</view>
       </picker>
     </view>
-    <button class="mini-menu" bindtap="openSettings">•••</button>
   </view>
 
   <view wx:if="{{needsSettings}}" class="notice-card">
@@ -17,7 +16,7 @@
   <view class="hero-card">
     <view class="hero-label">知识采集中心</view>
     <view class="hero-title">把好资料，收进科室知识库</view>
-    <view class="hero-desc">提交后进入草稿，由桌面管理员审核</view>
+    <view class="hero-desc">提交后直接进入知识库处理流程</view>
     <view class="hero-bolt"></view>
   </view>
 
@@ -34,22 +33,6 @@
       <view class="action-desc">从微信选择 PDF / Word</view>
       <view class="action-arrow">›</view>
     </view>
-  </view>
-
-  <view class="section-row">
-    <view class="section-title">最近提交</view>
-    <button class="link-button" bindtap="loadRecentSubmissions" loading="{{submissionsLoading}}">刷新 ›</button>
-  </view>
-
-  <view wx:if="{{!recentSubmissions.length && !submissionsLoading}}" class="empty-state">暂无提交记录</view>
-  <view wx:for="{{recentSubmissions}}" wx:key="id" class="submission-row">
-    <view class="submission-icon {{item.kind === 'file' ? 'file' : 'article'}}">{{item.kind === 'file' ? item.fileBadge : '▤'}}</view>
-    <view class="submission-main">
-      <view class="submission-title">{{item.displayTitle}}</view>
-      <view class="submission-meta">{{item.kindText}} · {{item.timeText}}</view>
-    </view>
-    <view class="status-pill status-{{item.status}}">{{item.statusText}}</view>
-    <view class="row-arrow">›</view>
   </view>
 
   <bottom-nav active="collect" />

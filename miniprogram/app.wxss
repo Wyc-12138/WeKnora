@@ -124,7 +124,7 @@ button[disabled] {
 }
 
 .mp-back,
-.mp-more {
+.mp-topbar-spacer {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,6 +137,10 @@ button[disabled] {
   color: #101114;
   font-size: 42rpx;
   line-height: 1;
+}
+
+.mp-topbar-spacer {
+  visibility: hidden;
 }
 
 .primary-button {
@@ -160,7 +164,6 @@ button[disabled] {
   font-weight: 700;
 }
 
-.status-pending_review,
 .status-processing {
   background: #fff1df;
   color: #ef7d00;

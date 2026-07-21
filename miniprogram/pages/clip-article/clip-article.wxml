@@ -2,7 +2,7 @@
   <view class="mp-topbar">
     <button class="mp-back" bindtap="goBack">‹</button>
     <view class="mp-page-title">剪藏文章</view>
-    <view class="mp-more">•••</view>
+    <view class="mp-topbar-spacer"></view>
   </view>
 
   <view class="screen-title">粘贴公众号文章链接</view>

@@ -207,59 +207,33 @@ function listKnowledgeFiles(knowledgeBaseId, params = {}) {
   })}`);
 }
 
-function previewMobileArticle(knowledgeBaseId, url) {
-  return request(`/api/v1/knowledge-bases/${knowledgeBaseId}/mobile-submissions/article/preview`, {
-    method: "POST",
-    data: { url }
-  });
+function withOriginalExtension(title, file) {
+  const cleanTitle = String(title || "").trim();
+  if (!cleanTitle) return "";
+  if (/\.[a-z0-9]+$/i.test(cleanTitle)) return cleanTitle;
+  const sourceName = String(file.name || file.fileName || file.title || "");
+  const match = sourceName.match(/(\.[a-z0-9]+)$/i);
+  return match ? `${cleanTitle}${match[1]}` : cleanTitle;
 }
 
-function createArticleSubmission(knowledgeBaseId, data) {
-  return request(`/api/v1/knowledge-bases/${knowledgeBaseId}/mobile-submissions/article`, {
-    method: "POST",
-    data: {
-      url: data.url,
-      title: data.title,
-      material_type: data.materialType,
-      note: data.note,
-      source: data.source,
-      published_at: data.publishedAt,
-      summary: data.summary,
-      cover_url: data.coverUrl
-    }
-  });
-}
-
-function uploadMobileSubmissionFile(knowledgeBaseId, file, options = {}) {
+function uploadKnowledgeFile(knowledgeBaseId, file, options = {}) {
   const filePath = file.path || file.tempFilePath || file.filePath;
   if (!filePath) {
     return Promise.reject(new Error("WeChat did not provide a readable file path for this file."));
   }
-  return upload(`/api/v1/knowledge-bases/${knowledgeBaseId}/mobile-submissions/file`, filePath, {
-    fileName: file.name || file.fileName || file.title || "upload",
-    title: options.title || file.name || file.fileName || file.title || "upload",
-    channel: "wechat",
-    note: options.note || "",
-    material_type: options.materialType || ""
-  });
-}
+  const metadata = {};
+  if (options.materialType) metadata.material_type = options.materialType;
+  if (options.note) metadata.note = options.note;
 
-function listMobileSubmissions(params = {}) {
-  return request(`/api/v1/mobile-submissions${buildQuery({
-    page: params.page || 1,
-    page_size: params.page_size || 5,
-    status: params.status
-  })}`);
-}
-
-function uploadKnowledgeFile(knowledgeBaseId, file) {
-  const filePath = file.path || file.tempFilePath || file.filePath;
-  if (!filePath) {
-    return Promise.reject(new Error("WeChat did not provide a readable file path for this file."));
+  const formData = {
+    fileName: withOriginalExtension(options.title, file) || file.name || file.fileName || file.title || "upload",
+    channel: "wechat"
+  };
+  if (Object.keys(metadata).length) {
+    formData.metadata = JSON.stringify(metadata);
   }
   return upload(`/api/v1/knowledge-bases/${knowledgeBaseId}/knowledge/file`, filePath, {
-    fileName: file.name || file.fileName || file.title || "upload",
-    channel: "wechat"
+    ...formData
   });
 }
 
@@ -369,7 +343,6 @@ function loadMessages(sessionId, limit = 30, beforeTime = "") {
 
 module.exports = {
   buildQuery,
-  createArticleSubmission,
   createKnowledgeFromURL,
   createSession,
   deleteSession,
@@ -381,16 +354,13 @@ module.exports = {
   knowledgeChatStream,
   listKnowledgeBases,
   listKnowledgeFiles,
-  listMobileSubmissions,
   listSessions,
   loadMessages,
   pinSession,
-  previewMobileArticle,
   request,
   streamRequest,
   unpinSession,
   updateSession,
   upload,
   uploadKnowledgeFile,
-  uploadMobileSubmissionFile
 };

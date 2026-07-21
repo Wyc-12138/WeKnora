@@ -1,5 +1,6 @@
 const { getSettings, saveSettings } = require("../../utils/config");
-const { listKnowledgeBases, uploadMobileSubmissionFile } = require("../../utils/request");
+const { listKnowledgeBases, uploadKnowledgeFile } = require("../../utils/request");
+const { clearPendingImport, getPendingImport } = require("../../utils/import-material");
 const { normalizeList } = require("../../utils/normalize");
 
 function normalizeKnowledgeBases(response) {
@@ -18,14 +19,19 @@ function formatSize(size = 0) {
   return `${Math.ceil(size / 1024)} KB`;
 }
 
+function displayFileMeta(ext, size) {
+  return [ext ? ext.toUpperCase() : "", formatSize(size)].filter(Boolean).join(" / ") || "Selected";
+}
+
 Page({
   data: {
     file: {},
     fileBadge: "DOC",
     fileMeta: "PDF / Word",
+    importId: "",
     knowledgeBases: [],
     knowledgeBaseNames: [],
-    materialType: "指南 / 共识",
+    materialType: "Guide / consensus",
     note: "",
     selectedIndex: 0,
     selectedKnowledgeBaseId: "",
@@ -34,12 +40,45 @@ Page({
     title: ""
   },
 
-  onLoad() {
-    this.setData({ selectedKnowledgeBaseId: getSettings().selectedKnowledgeBaseId || "" });
+  onLoad(options = {}) {
+    const importId = decodeURIComponent(options.importId || "");
+    this.setData({
+      importId,
+      selectedKnowledgeBaseId: getSettings().selectedKnowledgeBaseId || ""
+    });
+    this.loadPendingFile(importId);
   },
 
   onShow() {
+    if (!this.data.file.path) {
+      this.loadPendingFile(this.data.importId);
+    }
     this.loadKnowledgeBases();
+  },
+
+  loadPendingFile(importId = "") {
+    const pending = getPendingImport(importId);
+    const material = (pending?.materials || []).find((item) => item.kind === "file");
+    if (!material?.path) return;
+
+    const ext = getExt(material.name || material.path || material.fileName);
+    const name = material.name || material.fileName || material.title || "wechat-file";
+    const file = {
+      path: material.path,
+      name,
+      fileName: name,
+      size: material.size || 0,
+      fileType: material.fileType || ext
+    };
+    const title = this.data.title || String(name).replace(/\.[^.]+$/, "");
+
+    this.setData({
+      importId: pending.id || importId || "",
+      file,
+      fileBadge: ext ? ext.toUpperCase() : "DOC",
+      fileMeta: displayFileMeta(ext, file.size),
+      title
+    });
   },
 
   async loadKnowledgeBases() {
@@ -58,7 +97,7 @@ Page({
         selectedKnowledgeBaseName: selected?.name || selected?.id || ""
       });
     } catch (error) {
-      wx.showModal({ title: "知识库加载失败", content: error.message, showCancel: false });
+      wx.showModal({ title: "Load knowledge bases failed", content: error.message, showCancel: false });
     }
   },
 
@@ -75,7 +114,7 @@ Page({
         this.setData({
           file,
           fileBadge: ext ? ext.toUpperCase() : "DOC",
-          fileMeta: [ext ? ext.toUpperCase() : "", formatSize(file.size)].filter(Boolean).join(" · ") || "已选择",
+          fileMeta: displayFileMeta(ext, file.size),
           title
         });
       }
@@ -106,19 +145,20 @@ Page({
     this.setData({ note: event.detail.value });
   },
 
-  async submitDraft() {
+  async submitKnowledge() {
     if (this.data.submitting || !this.data.file.path || !this.data.selectedKnowledgeBaseId) return;
     this.setData({ submitting: true });
     try {
-      await uploadMobileSubmissionFile(this.data.selectedKnowledgeBaseId, this.data.file, {
+      await uploadKnowledgeFile(this.data.selectedKnowledgeBaseId, this.data.file, {
         title: this.data.title.trim(),
         materialType: this.data.materialType.trim(),
         note: this.data.note.trim()
       });
-      wx.showToast({ title: "已提交草稿", icon: "success" });
+      clearPendingImport(this.data.importId);
+      wx.showToast({ title: "已导入知识库", icon: "success" });
       wx.redirectTo({ url: "/pages/index/index" });
     } catch (error) {
-      wx.showModal({ title: "提交失败", content: error.message, showCancel: false });
+      wx.showModal({ title: "Submit failed", content: error.message, showCancel: false });
     } finally {
       this.setData({ submitting: false });
     }

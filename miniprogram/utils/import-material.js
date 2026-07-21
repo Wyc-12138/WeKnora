@@ -29,18 +29,19 @@ function getFileExtension(name = "") {
 }
 
 function normalizeMaterial(raw = {}) {
-  const path = raw.path || raw.filePath || raw.tempFilePath || raw.url || "";
+  const url = raw.url || raw.webUrl || raw.webpageUrl || raw.link || raw.href || "";
+  const path = raw.path || raw.filePath || raw.tempFilePath || url || "";
   const name = raw.name || raw.fileName || raw.title || "";
   const type = String(raw.type || raw.materialType || "").toLowerCase();
   const ext = getFileExtension(name || path);
 
-  if (type === "webview" || type === "url" || looksLikeURL(raw.url) || looksLikeURL(path)) {
-    const url = raw.url || path;
+  if (type === "webview" || type === "url" || type === "text/html" || looksLikeURL(url) || looksLikeURL(path)) {
+    const resolvedURL = looksLikeURL(url) ? url : (looksLikeURL(path) ? path : "");
     return {
       kind: "url",
       source: "wechat_article",
-      title: raw.title || name || "Wechat article",
-      url,
+      title: raw.title || name || "微信文章",
+      url: resolvedURL,
       raw
     };
   }
@@ -109,6 +110,12 @@ function savePendingImport(materials) {
   return importId;
 }
 
+function firstImportTarget(materials = []) {
+  const first = (Array.isArray(materials) ? materials : [materials]).filter(Boolean)[0];
+  if (!first) return "";
+  return first.kind === "url" ? "pages/clip-article/clip-article" : "pages/upload-confirm/upload-confirm";
+}
+
 function getPendingImport(importId) {
   const pending = wx.getStorageSync(PENDING_IMPORT_KEY) || null;
   if (!pending || (importId && pending.id !== importId)) return null;
@@ -126,6 +133,7 @@ module.exports = {
   PENDING_IMPORT_KEY,
   clearPendingImport,
   extractImportMaterials,
+  firstImportTarget,
   getFileExtension,
   getPendingImport,
   looksLikeURL,

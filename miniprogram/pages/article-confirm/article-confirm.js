@@ -1,5 +1,5 @@
 const { getSettings, saveSettings } = require("../../utils/config");
-const { createArticleSubmission, listKnowledgeBases } = require("../../utils/request");
+const { createKnowledgeFromURL, listKnowledgeBases } = require("../../utils/request");
 const { normalizeList } = require("../../utils/normalize");
 
 const PREVIEW_KEY = "weknora_article_preview";
@@ -12,8 +12,6 @@ Page({
   data: {
     knowledgeBases: [],
     knowledgeBaseNames: [],
-    materialType: "指南 / 共识解读",
-    note: "",
     preview: {},
     selectedIndex: 0,
     selectedKnowledgeBaseId: "",
@@ -72,30 +70,15 @@ Page({
     this.setData({ title: event.detail.value });
   },
 
-  onMaterialTypeInput(event) {
-    this.setData({ materialType: event.detail.value });
-  },
-
-  onNoteInput(event) {
-    this.setData({ note: event.detail.value });
-  },
-
-  async submitDraft() {
+  async submitKnowledge() {
     if (this.data.submitting || !this.data.selectedKnowledgeBaseId) return;
     this.setData({ submitting: true });
     try {
-      await createArticleSubmission(this.data.selectedKnowledgeBaseId, {
-        url: this.data.preview.url,
-        title: this.data.title.trim(),
-        materialType: this.data.materialType.trim(),
-        note: this.data.note.trim(),
-        source: this.data.preview.source,
-        publishedAt: this.data.preview.published_at,
-        summary: this.data.preview.summary,
-        coverUrl: this.data.preview.cover_url
+      await createKnowledgeFromURL(this.data.selectedKnowledgeBaseId, this.data.preview.url, {
+        title: this.data.title.trim()
       });
       wx.removeStorageSync(PREVIEW_KEY);
-      wx.showToast({ title: "已提交草稿", icon: "success" });
+      wx.showToast({ title: "已导入知识库", icon: "success" });
       wx.redirectTo({ url: "/pages/index/index" });
     } catch (error) {
       wx.showModal({ title: "提交失败", content: error.message, showCancel: false });

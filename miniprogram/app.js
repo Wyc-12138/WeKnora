@@ -1,4 +1,4 @@
-const { extractImportMaterials, savePendingImport } = require("./utils/import-material");
+const { extractImportMaterials, firstImportTarget, savePendingImport } = require("./utils/import-material");
 
 function ensureSettings() {
   const settings = wx.getStorageSync("weknora_settings");
@@ -15,7 +15,16 @@ function ensureSettings() {
 function routeImportMaterials(options) {
   const materials = extractImportMaterials(options);
   if (!materials.length) return;
-  savePendingImport(materials);
+  const importId = savePendingImport(materials);
+  const target = firstImportTarget(materials);
+  if (!importId || !target) return;
+  const currentPath = options.path || "";
+  if (currentPath === target) return;
+  setTimeout(() => {
+    wx.redirectTo({
+      url: `/${target}?importId=${encodeURIComponent(importId)}`
+    });
+  }, 0);
 }
 
 App({
