@@ -133,6 +133,21 @@ class TestWebParserHelpers(unittest.TestCase):
         self.assertEqual(doc.metadata["source"], "wechat_official_account")
         fetch_one_mock.assert_not_called()
 
+    @patch("docreader.parser.web_parser.fetch_one")
+    def test_parse_wechat_returns_empty_when_direct_ua_fetch_fails(self, fetch_one_mock):
+        html = "<html><body>环境异常 当前环境异常，完成验证后即可继续访问。</body></html>"
+        parser = StdWebParser(title="wechat")
+        with patch.object(
+            parser,
+            "fetch_direct",
+            return_value=_ScrapeResult(html=html, visible_text="", page_title=""),
+        ):
+            doc = parser.parse_into_text(b"https://mp.weixin.qq.com/s/demo")
+
+        self.assertEqual(doc.content, "")
+        self.assertEqual(doc.metadata, {})
+        fetch_one_mock.assert_not_called()
+
     def test_redirect_target_blocked_before_navigation(self):
         safe, reason = is_ssrf_safe_url("http://127.0.0.1:39127/audit.txt")
         self.assertFalse(safe)

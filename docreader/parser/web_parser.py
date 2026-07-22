@@ -20,7 +20,6 @@ from docreader.parser.chain_parser import PipelineParser
 from docreader.parser.markdown_parser import MarkdownParser
 from docreader.utils import endecode
 from docreader.utils.browser_crawler import BrowserCrawlConfig, fetch_one
-from docreader.utils.redfox_provider import fetch_redfox_article
 from docreader.utils.ssrf import is_ssrf_safe_url
 
 logger = logging.getLogger(__name__)
@@ -561,7 +560,9 @@ class StdWebParser(BaseParser):
                         response.close()
                         return empty
                     chunks.append(chunk)
-                encoding = response.encoding or response.apparent_encoding or "utf-8"
+                encoding = response.encoding or ""
+                if not encoding or encoding.lower() in {"iso-8859-1", "latin-1"}:
+                    encoding = response.apparent_encoding or "utf-8"
                 response.close()
                 html = b"".join(chunks).decode(encoding, errors="replace")
                 visible_text = visible_text_from_html(html)
@@ -604,24 +605,11 @@ class StdWebParser(BaseParser):
                     direct_doc.metadata.get("title", ""),
                 )
                 return direct_doc
-            logger.warning(
-                "Direct WeChat UA fetch did not return usable article content; falling back"
+            logger.error(
+                "Direct WeChat UA fetch did not return usable article content; url=%s",
+                redacted_url,
             )
-
-        if is_wechat_article_url(url) and CONFIG.wechat_redfox_enabled and CONFIG.redfox_api_key:
-            redfox_doc = fetch_redfox_article(
-                url,
-                api_key=CONFIG.redfox_api_key,
-                base_url=CONFIG.redfox_base_url,
-            )
-            if redfox_doc is not None:
-                logger.info(
-                    "Parsed WeChat article via RedFox provider: content_len=%d title=%r",
-                    len(redfox_doc.content),
-                    redfox_doc.metadata.get("title", ""),
-                )
-                return redfox_doc
-            logger.warning("RedFox provider did not return usable content; falling back to browser crawler")
+            return Document()
 
         result = asyncio.run(
             fetch_one(
