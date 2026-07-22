@@ -15,6 +15,7 @@ from docreader.auth import AuthInterceptor, TLSConfigError, load_tls_credentials
 from docreader import config
 from docreader.config import CONFIG
 from docreader.parser import Parser
+from docreader.parser.web_parser import redact_url_for_log
 from docreader.proto import docreader_pb2_grpc
 from docreader.parser.registry import registry
 from docreader.proto.docreader_pb2 import (
@@ -161,7 +162,7 @@ class DocReaderServicer(docreader_pb2_grpc.DocReaderServicer):
         engine_overrides = dict(cfg.parser_engine_overrides) if cfg else {}
 
         if request.url:
-            logger.info("Read(URL): url=%s", request.url)
+            logger.info("Read(URL): url=%s", redact_url_for_log(request.url))
             result = self.parser.parse_url(
                 request.url,
                 request.title,

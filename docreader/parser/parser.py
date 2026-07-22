@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from docreader.models.document import Document
 from docreader.parser.registry import registry
-from docreader.parser.web_parser import WebParser
+from docreader.parser.web_parser import WebParser, redact_url_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -91,13 +91,19 @@ class Parser:
         engine_overrides: Optional[dict[str, Any]] = None,
     ) -> Document:
         """Parse content from a URL to markdown."""
-        logger.info("Parsing URL: %s, title: %s", url, title)
+        logger.info("Parsing URL: %s, title: %s", redact_url_for_log(url), title)
 
         parser = WebParser(title=title)
         logger.info("Starting to parse URL content")
         result = parser.parse(url.encode())
 
         if not result.content:
-            logger.warning("Parser returned empty content for url: %s", url)
-        logger.info("Parsed url %s, content length=%d", url, len(result.content))
+            logger.warning(
+                "Parser returned empty content for url: %s", redact_url_for_log(url)
+            )
+        logger.info(
+            "Parsed url %s, content length=%d",
+            redact_url_for_log(url),
+            len(result.content),
+        )
         return result
