@@ -2901,7 +2901,30 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		}
 	} else if payload.URL != "" {
 		// URL import
-		convertResult, err = s.convert(ctx, payload, kb, knowledge, eff, isLastRetry)
+		if docparser.IsWeChatArticleURL(payload.URL) {
+			s.beginStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
+				"is_url":            true,
+				"url":               payload.URL,
+				"is_wechat_article": true,
+			})
+			article, extractErr := docparser.ExtractWeChatArticle(ctx, payload.URL)
+			if extractErr != nil {
+				s.failStage(ctx, knowledge.ID, types.StageDocReader,
+					werrors.ErrCodeDocReaderParseFailed, "WeChat article extraction failed", extractErr)
+				return s.failKnowledge(ctx, knowledge, isLastRetry, "WeChat article extraction failed: %v", extractErr)
+			}
+			convertResult = article.ReadResult
+			s.endStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
+				"text_length":         len(convertResult.MarkdownContent),
+				"images_found":        len(convertResult.ImageRefs),
+				"inline_images":       article.InlineImageCount,
+				"background_images":   article.BackgroundImageCount,
+				"total_unique_images": article.TotalUniqueImageCount,
+				"is_wechat_article":   true,
+			})
+		} else {
+			convertResult, err = s.convert(ctx, payload, kb, knowledge, eff, isLastRetry)
+		}
 		if err != nil {
 			return err
 		}
