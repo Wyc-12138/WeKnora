@@ -19,6 +19,7 @@ from docreader.parser.base_parser import BaseParser
 from docreader.parser.chain_parser import PipelineParser
 from docreader.parser.markdown_parser import MarkdownParser
 from docreader.utils import endecode
+from docreader.utils.browser_crawler import BrowserCrawlConfig, fetch_one
 from docreader.utils.ssrf import is_ssrf_safe_url
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,21 @@ _WECHAT_BLOCK_MARKERS = (
     "环境异常",
     "完成验证",
     "去验证",
+    "参数错误",
+    "验证码",
+    "人机验证",
     "请在微信客户端打开",
+    "请在客户端打开",
     "访问过于频繁",
     "当前网络环境存在异常",
     "系统暂时限制",
+    "轻点两下取消赞",
+    "轻点两下取消在看",
+    "security verification",
+    "verify you are human",
+    "captcha",
+    "access denied",
+    "too many requests",
 )
 
 # Monkey-patch trafilatura internals to better support WeChat Official Account
@@ -575,102 +587,37 @@ class StdWebParser(BaseParser):
         """
         url = endecode.decode_bytes(content)
         redacted_url = redact_url_for_log(url)
-        is_wechat_url = is_wechat_article_url(url)
 
         logger.info("Scraping web page: %s", redacted_url)
-        scrape_result = self.fetch_direct(url) if is_wechat_url else _ScrapeResult("", "", "")
-        if (
-            is_wechat_url
-            and scrape_result.html
-            and not is_wechat_blocked_content(
-                "\n".join((scrape_result.visible_text, scrape_result.page_title))
-            )
-            and not has_wechat_article_root(scrape_result.html)
-        ):
-            logger.info(
-                "WeChat direct fetch did not include an article root; trying browser render"
-            )
-            scrape_result = asyncio.run(self.scrape(url))
-        if not scrape_result.html and not scrape_result.visible_text:
-            scrape_result = asyncio.run(self.scrape(url))
-        if not scrape_result.html and not scrape_result.visible_text:
-            logger.error("Failed to scrape web page (no HTML or visible text)")
-            return Document()
-
-        if is_wechat_url:
-            combined_text = "\n".join(
-                part for part in (scrape_result.visible_text, scrape_result.page_title) if part
-            )
-            if is_wechat_blocked_content(combined_text):
-                logger.error(
-                    "WeChat article page was blocked or requires verification: %s",
-                    redacted_url,
-                )
-                return Document()
-
-            wechat_doc = extract_wechat_article_document(
-                scrape_result.html,
+        result = asyncio.run(
+            fetch_one(
                 url,
-                self.title or scrape_result.page_title,
+                BrowserCrawlConfig(
+                    browser=_normalize_browser_name(CONFIG.web_browser),
+                    browser_channel=CONFIG.web_browser_channel,
+                    executable_path=CONFIG.web_browser_executable_path,
+                    timeout_ms=_GOTO_TIMEOUT_MS,
+                    max_depth=0,
+                    max_pages=1,
+                    proxy=self.proxy,
+                ),
             )
-            if wechat_doc:
-                logger.info(
-                    "Extracted WeChat article: content_len=%d, title=%r",
-                    len(wechat_doc.content),
-                    wechat_doc.metadata.get("title", ""),
-                )
-                return wechat_doc
-            logger.warning(
-                "WeChat-specific extraction failed, trying generic extraction"
-            )
+        )
 
-        md_text = extract_markdown_from_html(scrape_result.html)
-        if not md_text:
-            md_text = build_visible_text_fallback(
-                scrape_result.visible_text,
-                scrape_result.page_title,
+        if result.status != "ok":
+            logger.error(
+                "Failed to parse web page with shared browser crawler: status=%s reason=%s error=%s url=%s",
+                result.status,
+                result.block_reason,
+                result.error,
+                redacted_url,
             )
-            if md_text:
-                logger.info(
-                    "Trafilatura empty; using Playwright visible-text fallback (%d chars)",
-                    len(md_text),
-                )
-
-        if not md_text:
-            logger.error("Failed to parse web page")
             return Document()
-
-        if is_wechat_url:
-            if is_wechat_blocked_content(md_text):
-                logger.error("Generic extraction matched WeChat block-page markers")
-                return Document()
-            if markdown_visible_len(md_text) < _WECHAT_MIN_ARTICLE_TEXT_LEN:
-                logger.error(
-                    "Generic extraction produced too little WeChat article text: %d chars",
-                    markdown_visible_len(md_text),
-                )
-                return Document()
 
         metadata = {}
-        title_match = re.search(r"^title:\s*(.+)", md_text, re.MULTILINE)
-        if title_match:
-            extracted_title = title_match.group(1).strip()
-            if extracted_title:
-                metadata["title"] = extracted_title
-                logger.info(
-                    f"Extracted article title from trafilatura: {extracted_title}"
-                )
-        elif scrape_result.page_title:
-            metadata["title"] = scrape_result.page_title.strip()
-            logger.info(
-                "Using page title from Playwright: %s", metadata["title"]
-            )
-        else:
-            logger.info(
-                "No title found in trafilatura output, first 200 chars: %r",
-                md_text[:200],
-            )
-        return Document(content=md_text, metadata=metadata)
+        if result.title:
+            metadata["title"] = result.title
+        return Document(content=result.markdown, metadata=metadata)
 
 
 class WebParser(PipelineParser):
