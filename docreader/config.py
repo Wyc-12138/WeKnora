@@ -76,6 +76,11 @@ class DocReaderConfig:
     web_browser_channel: str
     web_browser_executable_path: str
 
+    # WeChat article provider
+    wechat_redfox_enabled: bool
+    redfox_api_key: str
+    redfox_base_url: str
+
     # Temp image output directory (shared with Go app via volume, local mode fallback)
     image_output_dir: str
 
@@ -133,6 +138,9 @@ def load_config() -> DocReaderConfig:
     web_browser_executable_path = _get_str(
         ["DOCREADER_WEB_BROWSER_EXECUTABLE_PATH"], ""
     )
+    wechat_redfox_enabled = _get_bool(["DOCREADER_WECHAT_REDFOX_ENABLED"], True)
+    redfox_api_key = _get_str(["REDFOX_API_KEY", "DOCREADER_REDFOX_API_KEY"], "")
+    redfox_base_url = _get_str(["REDFOX_BASE_URL", "DOCREADER_REDFOX_BASE_URL"], "https://redfox.hk")
 
     image_output_dir = _get_str(
         ["DOCREADER_IMAGE_OUTPUT_DIR", "IMAGE_OUTPUT_DIR"], "/tmp/docreader"
@@ -160,6 +168,9 @@ def load_config() -> DocReaderConfig:
         web_browser=web_browser,
         web_browser_channel=web_browser_channel,
         web_browser_executable_path=web_browser_executable_path,
+        wechat_redfox_enabled=wechat_redfox_enabled,
+        redfox_api_key=redfox_api_key,
+        redfox_base_url=redfox_base_url,
         image_output_dir=image_output_dir,
     )
 
@@ -191,6 +202,9 @@ def dump_config(mask_secrets: bool = True) -> Dict[str, Any]:
         "DOCREADER_WEB_BROWSER": cfg.web_browser,
         "DOCREADER_WEB_BROWSER_CHANNEL": cfg.web_browser_channel,
         "DOCREADER_WEB_BROWSER_EXECUTABLE_PATH": cfg.web_browser_executable_path,
+        "DOCREADER_WECHAT_REDFOX_ENABLED": cfg.wechat_redfox_enabled,
+        "REDFOX_API_KEY": _mask_secret(cfg.redfox_api_key) if mask_secrets else cfg.redfox_api_key,
+        "REDFOX_BASE_URL": cfg.redfox_base_url,
         "DOCREADER_IMAGE_OUTPUT_DIR": cfg.image_output_dir,
     }
     return d

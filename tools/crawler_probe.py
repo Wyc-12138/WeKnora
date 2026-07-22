@@ -14,10 +14,21 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from docreader.config import CONFIG
 from docreader.utils.browser_crawler import BrowserCrawlConfig, crawl
+from docreader.utils.redfox_provider import fetch_redfox_article
+
+
+def _is_wechat_article_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.hostname == "mp.weixin.qq.com"
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,7 +100,52 @@ def main() -> None:
         respect_robots=args.respect_robots,
         allow_private_net=args.allow_private_net,
     )
-    output = asyncio.run(crawl(args.url, config))
+    redfox_doc = None
+    if _is_wechat_article_url(args.url) and CONFIG.wechat_redfox_enabled and CONFIG.redfox_api_key:
+        redfox_doc = fetch_redfox_article(
+            args.url,
+            api_key=CONFIG.redfox_api_key,
+            base_url=CONFIG.redfox_base_url,
+        )
+
+    if redfox_doc is not None:
+        output = {
+            "prototype": "crawler_probe",
+            "seed_url": args.url,
+            "config": {
+                "max_depth": args.max_depth,
+                "max_pages": args.max_pages,
+                "allowed_domains": sorted(config.allowed_domains),
+                "delay_ms": args.delay_ms,
+                "browser": args.browser,
+                "browser_channel": args.browser_channel,
+                "executable_path": args.executable_path,
+                "respect_robots": args.respect_robots,
+                "allow_private_net": args.allow_private_net,
+                "redfox_enabled": True,
+            },
+            "summary": {"ok": 1, "blocked": 0, "failed": 0, "visited": 1, "queued": 1},
+            "pages": [
+                {
+                    "url": args.url,
+                    "depth": 0,
+                    "status": "ok",
+                    "title": redfox_doc.metadata.get("title", ""),
+                    "http_status": 200,
+                    "markdown": redfox_doc.content,
+                    "markdown_length": len(redfox_doc.content),
+                    "visible_text_length": len(redfox_doc.content),
+                    "discovered_links": [],
+                    "block_reason": "",
+                    "method": "redfox",
+                    "error": "",
+                    "elapsed_ms": 0,
+                    "metadata": redfox_doc.metadata,
+                }
+            ],
+        }
+    else:
+        output = asyncio.run(crawl(args.url, config))
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
