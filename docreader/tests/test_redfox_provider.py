@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from docreader.utils.redfox_provider import fetch_redfox_article
+from docreader.utils.redfox_provider import fetch_redfox_article, fetch_redfox_article_with_diagnostics
 
 
 class TestRedFoxProvider(unittest.TestCase):
@@ -53,6 +53,35 @@ class TestRedFoxProvider(unittest.TestCase):
         doc = fetch_redfox_article("https://mp.weixin.qq.com/s/example", api_key="ak_test")
 
         self.assertIsNone(doc)
+
+    @patch("docreader.utils.redfox_provider.requests.post")
+    def test_diagnostics_report_short_or_empty_content(self, post):
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {
+            "code": 2000,
+            "msg": "ok",
+            "data": {
+                "content": "",
+                "title": "Short article shell",
+                "author": "tester",
+                "workUrl": "https://mp.weixin.qq.com/s/example",
+            },
+        }
+        post.return_value = response
+
+        doc, diag = fetch_redfox_article_with_diagnostics(
+            "https://mp.weixin.qq.com/s/example",
+            api_key="ak_test",
+        )
+
+        self.assertIsNone(doc)
+        self.assertEqual(diag["http_status"], 200)
+        self.assertEqual(diag["code"], 2000)
+        self.assertEqual(diag["title"], "Short article shell")
+        self.assertEqual(diag["content_length"], 0)
+        self.assertFalse(diag["usable"])
+        self.assertEqual(diag["error"], "no_usable_content")
 
     def test_fetch_redfox_article_without_key_returns_none(self):
         doc = fetch_redfox_article("https://mp.weixin.qq.com/s/example", api_key="")

@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docreader.config import CONFIG
 from docreader.utils.browser_crawler import BrowserCrawlConfig, crawl
-from docreader.utils.redfox_provider import fetch_redfox_article
+from docreader.utils.redfox_provider import fetch_redfox_article_with_diagnostics
 
 
 def _is_wechat_article_url(url: str) -> bool:
@@ -101,8 +101,9 @@ def main() -> None:
         allow_private_net=args.allow_private_net,
     )
     redfox_doc = None
+    redfox_diag = None
     if _is_wechat_article_url(args.url) and CONFIG.wechat_redfox_enabled and CONFIG.redfox_api_key:
-        redfox_doc = fetch_redfox_article(
+        redfox_doc, redfox_diag = fetch_redfox_article_with_diagnostics(
             args.url,
             api_key=CONFIG.redfox_api_key,
             base_url=CONFIG.redfox_base_url,
@@ -124,6 +125,7 @@ def main() -> None:
                 "allow_private_net": args.allow_private_net,
                 "redfox_enabled": True,
             },
+            "redfox": redfox_diag,
             "summary": {"ok": 1, "blocked": 0, "failed": 0, "visited": 1, "queued": 1},
             "pages": [
                 {
@@ -146,6 +148,9 @@ def main() -> None:
         }
     else:
         output = asyncio.run(crawl(args.url, config))
+        if redfox_diag is not None:
+            output["redfox"] = redfox_diag
+            output.setdefault("config", {})["redfox_enabled"] = True
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")

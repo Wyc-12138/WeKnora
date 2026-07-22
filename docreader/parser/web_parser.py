@@ -590,6 +590,24 @@ class StdWebParser(BaseParser):
         redacted_url = redact_url_for_log(url)
 
         logger.info("Scraping web page: %s", redacted_url)
+        if is_wechat_article_url(url):
+            direct = self.fetch_direct(url)
+            direct_doc = extract_wechat_article_document(
+                direct.html,
+                url,
+                fallback_title=direct.page_title,
+            )
+            if direct_doc is not None:
+                logger.info(
+                    "Parsed WeChat article via direct WeChat UA fetch: content_len=%d title=%r",
+                    len(direct_doc.content),
+                    direct_doc.metadata.get("title", ""),
+                )
+                return direct_doc
+            logger.warning(
+                "Direct WeChat UA fetch did not return usable article content; falling back"
+            )
+
         if is_wechat_article_url(url) and CONFIG.wechat_redfox_enabled and CONFIG.redfox_api_key:
             redfox_doc = fetch_redfox_article(
                 url,
