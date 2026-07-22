@@ -3210,6 +3210,18 @@ func (s *knowledgeService) convert(
 			werrors.ErrCodeDocReaderParseFailed, result.Error, nil)
 		return nil, nil
 	}
+	if isWeChatBlockedDocReaderResult(req.URL, result.MarkdownContent) {
+		errMsg := "\u5fae\u4fe1\u516c\u4f17\u53f7\u9875\u9762\u88ab\u5fae\u4fe1\u98ce\u63a7\u62e6\u622a\uff0c\u672a\u5bfc\u5165\u62e6\u622a\u9875\u5185\u5bb9"
+		logger.Errorf(ctx, "[convert] blocked WeChat article content kb=%s knowledge=%s url=%q",
+			kb.ID, knowledge.ID, req.URL)
+		knowledge.ParseStatus = "failed"
+		knowledge.ErrorMessage = errMsg
+		knowledge.UpdatedAt = time.Now()
+		s.repo.UpdateKnowledge(ctx, knowledge)
+		s.failStage(ctx, knowledge.ID, types.StageDocReader,
+			werrors.ErrCodeDocReaderParseFailed, errMsg, nil)
+		return nil, nil
+	}
 	docOutput := types.JSONMap{
 		"text_length":  len(result.MarkdownContent),
 		"images_found": len(result.ImageRefs),
@@ -3256,6 +3268,34 @@ func (s *knowledgeService) callDocReaderWithTimeout(
 	}
 	logger.Infof(ctx, "[convert] docreader call ok in %s for %q", elapsed, req.FileName)
 	return result, nil
+}
+
+func isWeChatBlockedDocReaderResult(rawURL, content string) bool {
+	if rawURL == "" || content == "" {
+		return false
+	}
+	if !strings.Contains(strings.ToLower(rawURL), "mp.weixin.qq.com/") {
+		return false
+	}
+
+	normalized := strings.Join(strings.Fields(content), "")
+	for _, marker := range []string{
+		"\u5f53\u524d\u73af\u5883\u5f02\u5e38",
+		"\u73af\u5883\u5f02\u5e38",
+		"\u5b8c\u6210\u9a8c\u8bc1",
+		"\u53bb\u9a8c\u8bc1",
+		"\u8bf7\u5728\u5fae\u4fe1\u5ba2\u6237\u7aef\u6253\u5f00",
+		"\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41",
+		"\u5f53\u524d\u7f51\u7edc\u73af\u5883\u5b58\u5728\u5f02\u5e38",
+		"\u7cfb\u7edf\u6682\u65f6\u9650\u5236",
+		"\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u8d5e",
+		"\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u5728\u770b",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // isLikelyRateLimitError performs a fuzzy classification of an error as a
