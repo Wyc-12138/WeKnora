@@ -71,6 +71,11 @@ class DocReaderConfig:
     external_http_proxy: str
     external_https_proxy: str
 
+    # Web parser browser
+    web_browser: str
+    web_browser_channel: str
+    web_browser_executable_path: str
+
     # Temp image output directory (shared with Go app via volume, local mode fallback)
     image_output_dir: str
 
@@ -123,6 +128,11 @@ def load_config() -> DocReaderConfig:
     external_https_proxy = _get_str(
         ["DOCREADER_EXTERNAL_HTTPS_PROXY", "EXTERNAL_HTTPS_PROXY"], ""
     )
+    web_browser = _get_str(["DOCREADER_WEB_BROWSER"], "chromium")
+    web_browser_channel = _get_str(["DOCREADER_WEB_BROWSER_CHANNEL"], "")
+    web_browser_executable_path = _get_str(
+        ["DOCREADER_WEB_BROWSER_EXECUTABLE_PATH"], ""
+    )
 
     image_output_dir = _get_str(
         ["DOCREADER_IMAGE_OUTPUT_DIR", "IMAGE_OUTPUT_DIR"], "/tmp/docreader"
@@ -147,6 +157,9 @@ def load_config() -> DocReaderConfig:
         pdf_render_max_edge=pdf_render_max_edge,
         external_http_proxy=external_http_proxy,
         external_https_proxy=external_https_proxy,
+        web_browser=web_browser,
+        web_browser_channel=web_browser_channel,
+        web_browser_executable_path=web_browser_executable_path,
         image_output_dir=image_output_dir,
     )
 
@@ -175,6 +188,9 @@ def dump_config(mask_secrets: bool = True) -> Dict[str, Any]:
         "DOCREADER_PDF_RENDER_MAX_EDGE": cfg.pdf_render_max_edge,
         "DOCREADER_EXTERNAL_HTTP_PROXY": cfg.external_http_proxy,
         "DOCREADER_EXTERNAL_HTTPS_PROXY": cfg.external_https_proxy,
+        "DOCREADER_WEB_BROWSER": cfg.web_browser,
+        "DOCREADER_WEB_BROWSER_CHANNEL": cfg.web_browser_channel,
+        "DOCREADER_WEB_BROWSER_EXECUTABLE_PATH": cfg.web_browser_executable_path,
         "DOCREADER_IMAGE_OUTPUT_DIR": cfg.image_output_dir,
     }
     return d

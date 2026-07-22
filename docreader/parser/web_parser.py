@@ -40,6 +40,11 @@ _WECHAT_USER_AGENT = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "
     "MicroMessenger/8.0.42 NetType/WIFI Language/zh_CN"
 )
+_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 _SENSITIVE_QUERY_KEYS = {
     "access_token",
     "exportkey",
@@ -356,6 +361,28 @@ async def install_ssrf_route_guard(page: Page) -> None:
     await page.route("**/*", handle_route)
 
 
+def _normalize_browser_name(name: str) -> str:
+    name = (name or "chromium").strip().lower()
+    if name not in {"chromium", "webkit", "firefox"}:
+        logger.warning("Unsupported DOCREADER_WEB_BROWSER=%r, using chromium", name)
+        return "chromium"
+    return name
+
+
+def _build_browser_launch_kwargs(proxy: str) -> dict:
+    kwargs = {}
+    if proxy:
+        kwargs["proxy"] = {"server": proxy}
+    if CONFIG.web_browser_channel:
+        if _normalize_browser_name(CONFIG.web_browser) == "chromium":
+            kwargs["channel"] = CONFIG.web_browser_channel
+        else:
+            logger.warning("Ignoring DOCREADER_WEB_BROWSER_CHANNEL for non-chromium browser")
+    if CONFIG.web_browser_executable_path:
+        kwargs["executable_path"] = CONFIG.web_browser_executable_path
+    return kwargs
+
+
 class StdWebParser(BaseParser):
     """Standard web page parser using Playwright and Trafilatura.
 
@@ -394,13 +421,22 @@ class StdWebParser(BaseParser):
             return empty
         try:
             async with async_playwright() as p:
-                kwargs = {}
-                # Configure proxy if available
-                if self.proxy:
-                    kwargs["proxy"] = {"server": self.proxy}
-                logger.info("Launching WebKit browser")
-                browser = await p.webkit.launch(**kwargs)
-                page = await browser.new_page()
+                browser_name = _normalize_browser_name(CONFIG.web_browser)
+                kwargs = _build_browser_launch_kwargs(self.proxy)
+                logger.info("Launching %s browser", browser_name)
+                browser = await getattr(p, browser_name).launch(**kwargs)
+                context = await browser.new_context(
+                    user_agent=_BROWSER_USER_AGENT,
+                    locale="zh-CN",
+                    timezone_id="Asia/Shanghai",
+                    viewport={"width": 1365, "height": 900},
+                    extra_http_headers={
+                        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                        "Cache-Control": "no-cache",
+                        "Pragma": "no-cache",
+                    },
+                )
+                page = await context.new_page()
                 await install_ssrf_route_guard(page)
 
                 logger.info("Navigating to URL: %s", redact_url_for_log(url))
@@ -413,6 +449,7 @@ class StdWebParser(BaseParser):
                     logger.info("Initial page load complete")
                 except Exception as e:
                     logger.error(f"Error navigating to URL: {str(e)}")
+                    await context.close()
                     await browser.close()
                     return empty
 
@@ -428,6 +465,7 @@ class StdWebParser(BaseParser):
                     page_title[:80] if page_title else "",
                 )
 
+                await context.close()
                 await browser.close()
                 logger.info("Browser closed")
 
