@@ -593,6 +593,17 @@ class StdWebParser(BaseParser):
         logger.info("Scraping web page: %s", redacted_url)
         if is_wechat_article_url(url):
             direct = self.fetch_direct(url)
+            direct_has_article_root = has_wechat_article_root(direct.html)
+            direct_visible_len = len(normalize_text(direct.visible_text))
+            direct_blocked = is_wechat_blocked_content(direct.visible_text)
+            logger.info(
+                "Direct WeChat UA fetch diagnostics: html_len=%d visible_text_len=%d title=%r has_article_root=%s blocked_marker=%s",
+                len(direct.html),
+                direct_visible_len,
+                direct.page_title[:80] if direct.page_title else "",
+                direct_has_article_root,
+                direct_blocked,
+            )
             direct_doc = extract_wechat_article_document(
                 direct.html,
                 url,
@@ -606,8 +617,9 @@ class StdWebParser(BaseParser):
                 )
                 return direct_doc
             logger.error(
-                "Direct WeChat UA fetch did not return usable article content; url=%s",
+                "Direct WeChat UA fetch did not return usable article content; url=%s text_head=%r",
                 redacted_url,
+                normalize_text(direct.visible_text)[:240],
             )
             return Document()
 
