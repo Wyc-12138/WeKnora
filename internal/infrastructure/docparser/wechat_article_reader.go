@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -23,6 +24,9 @@ import (
 const (
 	wechatFetchTimeout = 30 * time.Second
 	wechatImageTimeout = 30 * time.Second
+	envWeChatPythonAddr = "WECHAT_ARTICLE_PYTHON_ADDR"
+	envWeChatPythonEnabled = "WECHAT_ARTICLE_PYTHON_ENABLED"
+	envWeChatPythonFallback = "WECHAT_ARTICLE_PYTHON_FALLBACK"
 )
 
 var (
@@ -72,6 +76,16 @@ func ExtractWeChatArticle(ctx context.Context, rawURL string) (*WeChatArticle, e
 	}
 	if err := secutils.ValidateURLForSSRF(rawURL); err != nil {
 		return nil, fmt.Errorf("URL rejected: %w", err)
+	}
+
+	if usePythonWeChatArticleReader() {
+		article, err := extractWeChatArticleViaPython(ctx, rawURL)
+		if err == nil {
+			return article, nil
+		}
+		if !pythonWeChatArticleFallbackEnabled() {
+			return nil, err
+		}
 	}
 
 	htmlText, err := fetchWeChatHTML(ctx, rawURL)
@@ -137,6 +151,87 @@ func ExtractWeChatArticle(ctx context.Context, rawURL string) (*WeChatArticle, e
 		BackgroundImageCount:  state.backgroundImageCount,
 		TotalUniqueImageCount: len(state.seenURLs),
 	}, nil
+}
+
+func usePythonWeChatArticleReader() bool {
+	addr := strings.TrimSpace(os.Getenv(envWeChatPythonAddr))
+	if addr == "" {
+		return false
+	}
+	enabled := strings.TrimSpace(os.Getenv(envWeChatPythonEnabled))
+	return enabled == "" || parseEnvBool(enabled)
+}
+
+func pythonWeChatArticleFallbackEnabled() bool {
+	value := strings.TrimSpace(os.Getenv(envWeChatPythonFallback))
+	return value == "" || parseEnvBool(value)
+}
+
+func parseEnvBool(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func extractWeChatArticleViaPython(ctx context.Context, rawURL string) (*WeChatArticle, error) {
+	addr := strings.TrimSpace(os.Getenv(envWeChatPythonAddr))
+	if addr == "" {
+		return nil, fmt.Errorf("%s is empty", envWeChatPythonAddr)
+	}
+	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+		addr = "http://" + addr
+	}
+
+	reader, err := NewHTTPDocumentReader(addr)
+	if err != nil {
+		return nil, fmt.Errorf("init Python WeChat article reader: %w", err)
+	}
+	result, err := reader.Read(ctx, &types.ReadRequest{
+		URL:   rawURL,
+		Title: "wechat-article",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Python WeChat article reader request failed: %w", err)
+	}
+	if result == nil {
+		return nil, fmt.Errorf("Python WeChat article reader returned nil result")
+	}
+	if strings.TrimSpace(result.Error) != "" {
+		return nil, fmt.Errorf("Python WeChat article reader returned error: %s", result.Error)
+	}
+	if strings.TrimSpace(result.MarkdownContent) == "" {
+		return nil, fmt.Errorf("Python WeChat article reader returned empty markdown")
+	}
+	if isWeChatBlockedContent(rawURL, result.MarkdownContent) {
+		return nil, fmt.Errorf("Python WeChat article content appears to be blocked or verification-gated")
+	}
+	if result.Metadata == nil {
+		result.Metadata = map[string]string{}
+	}
+	if _, ok := result.Metadata["source"]; !ok {
+		result.Metadata["source"] = rawURL
+	}
+
+	inlineImages := atoiDefault(result.Metadata["inline_images"], len(result.ImageRefs))
+	backgroundImages := atoiDefault(result.Metadata["background_images"], 0)
+	totalImages := atoiDefault(result.Metadata["total_unique_images"], len(result.ImageRefs))
+	return &WeChatArticle{
+		ReadResult:            result,
+		InlineImageCount:      inlineImages,
+		BackgroundImageCount:  backgroundImages,
+		TotalUniqueImageCount: totalImages,
+	}, nil
+}
+
+func atoiDefault(value string, fallback int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
 type wechatExtractState struct {

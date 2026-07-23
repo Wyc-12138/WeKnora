@@ -285,6 +285,37 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Python HTTP sidecar for local WeChat Official Account article extraction.
+  wechat-article-reader:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.docreader
+    image: wechatopenai/weknora-docreader:${WEKNORA_VERSION:-latest}
+    container_name: WeKnora-wechat-article-reader-dev
+    ports:
+      - "${WECHAT_ARTICLE_READER_PORT:-18080}:8080"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - DOCREADER_SERVE_HTTP=true
+      - DOCREADER_HTTP_PORT=8080
+      - DOCREADER_WEB_BROWSER=${DOCREADER_WEB_BROWSER:-chromium}
+      - DOCREADER_WEB_BROWSER_CHANNEL=${DOCREADER_WEB_BROWSER_CHANNEL:-}
+      - DOCREADER_WEB_BROWSER_EXECUTABLE_PATH=${DOCREADER_WEB_BROWSER_EXECUTABLE_PATH:-}
+      - DOCREADER_WECHAT_REDFOX_ENABLED=${DOCREADER_WECHAT_REDFOX_ENABLED:-true}
+      - REDFOX_API_KEY=${REDFOX_API_KEY:-}
+      - REDFOX_BASE_URL=${REDFOX_BASE_URL:-https://redfox.hk}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - WeKnora-network-dev
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # OpenDataLoader hybrid backend (optional). Enable profile "odl-hybrid" and set
   # DOCREADER_ODL_HYBRID=docling-fast on docreader. Default --no-ocr (no EasyOCR).
   # Local build only — not published to Docker Hub.

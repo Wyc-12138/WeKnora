@@ -1,6 +1,9 @@
 package docparser
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -76,5 +79,59 @@ func TestBuildWeChatMarkdown(t *testing.T) {
 	}
 	if got := strings.Count(md, "正文内容"); got != 1 {
 		t.Fatalf("duplicate adjacent paragraph was not collapsed, count=%d markdown=%s", got, md)
+	}
+}
+
+func TestExtractWeChatArticleViaPythonProvider(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != PathRead {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if req["url"] != "https://mp.weixin.qq.com/s/example" {
+			t.Fatalf("unexpected url: %#v", req["url"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"markdown_content": "# Python Article\n\nbody text",
+			"image_refs": []map[string]any{
+				{
+					"filename":     "image_001.png",
+					"original_ref": "images/image_001.png",
+					"mime_type":    "image/png",
+					"image_data":   "aW1hZ2U=",
+				},
+			},
+			"metadata": map[string]string{
+				"title":               "Python Article",
+				"inline_images":       "1",
+				"background_images":   "0",
+				"total_unique_images": "1",
+			},
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envWeChatPythonAddr, server.URL)
+	t.Setenv(envWeChatPythonFallback, "false")
+
+	article, err := ExtractWeChatArticle(t.Context(), "https://mp.weixin.qq.com/s/example")
+	if err != nil {
+		t.Fatalf("ExtractWeChatArticle returned error: %v", err)
+	}
+	if !strings.Contains(article.ReadResult.MarkdownContent, "Python Article") {
+		t.Fatalf("unexpected markdown: %s", article.ReadResult.MarkdownContent)
+	}
+	if got := len(article.ReadResult.ImageRefs); got != 1 {
+		t.Fatalf("image refs = %d, want 1", got)
+	}
+	if got := string(article.ReadResult.ImageRefs[0].ImageData); got != "image" {
+		t.Fatalf("decoded image data = %q, want image", got)
+	}
+	if article.InlineImageCount != 1 || article.TotalUniqueImageCount != 1 {
+		t.Fatalf("unexpected image counts: %+v", article)
 	}
 }

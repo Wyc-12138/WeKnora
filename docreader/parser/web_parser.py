@@ -1,6 +1,9 @@
 import asyncio
+import base64
+import hashlib
 import html as html_lib
 import logging
+import mimetypes
 import re
 from dataclasses import dataclass
 from typing import Optional
@@ -34,6 +37,9 @@ _MIN_FALLBACK_TEXT_LEN = 50
 _DIRECT_FETCH_TIMEOUT = (5, 20)
 _DIRECT_FETCH_REDIRECT_LIMIT = 5
 _DIRECT_FETCH_MAX_BYTES = 5 * 1024 * 1024
+_WECHAT_IMAGE_TIMEOUT = (5, 25)
+_WECHAT_IMAGE_MAX_BYTES = 20 * 1024 * 1024
+_WECHAT_IMAGE_REDIRECT_LIMIT = 5
 _WECHAT_MIN_ARTICLE_TEXT_LEN = 120
 _WECHAT_HOST = "mp.weixin.qq.com"
 _WECHAT_USER_AGENT = (
@@ -56,20 +62,20 @@ _SENSITIVE_QUERY_KEYS = {
     "uin",
 }
 _WECHAT_BLOCK_MARKERS = (
-    "当前环境异常",
-    "环境异常",
-    "完成验证",
-    "去验证",
-    "参数错误",
-    "验证码",
-    "人机验证",
-    "请在微信客户端打开",
-    "请在客户端打开",
-    "访问过于频繁",
-    "当前网络环境存在异常",
-    "系统暂时限制",
-    "轻点两下取消赞",
-    "轻点两下取消在看",
+    "\u5f53\u524d\u73af\u5883\u5f02\u5e38",
+    "\u73af\u5883\u5f02\u5e38",
+    "\u5b8c\u6210\u9a8c\u8bc1",
+    "\u53bb\u9a8c\u8bc1",
+    "\u53c2\u6570\u9519\u8bef",
+    "\u9a8c\u8bc1\u7801",
+    "\u4eba\u673a\u9a8c\u8bc1",
+    "\u8bf7\u5728\u5fae\u4fe1\u5ba2\u6237\u7aef\u6253\u5f00",
+    "\u8bf7\u5728\u5ba2\u6237\u7aef\u6253\u5f00",
+    "\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41",
+    "\u5f53\u524d\u7f51\u7edc\u73af\u5883\u5b58\u5728\u5f02\u5e38",
+    "\u7cfb\u7edf\u6682\u65f6\u9650\u5236",
+    "\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u8d5e",
+    "\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u5728\u770b",
     "security verification",
     "verify you are human",
     "captcha",
@@ -226,6 +232,93 @@ def _normalize_image_url(src: str, base_url: str) -> str:
     return urljoin(base_url, src)
 
 
+def _image_ext(image_url: str, content_type: str) -> str:
+    try:
+        parsed = urlparse(image_url)
+        query = dict(parse_qsl(parsed.query))
+        for key in ("wx_fmt", "tp"):
+            value = query.get(key, "").lower().replace("jpeg", "jpg")
+            if value in {"jpg", "png", "gif", "webp", "bmp"}:
+                return value
+    except Exception:
+        pass
+
+    mime_type = (content_type or "").split(";", 1)[0].strip().lower()
+    ext = mimetypes.guess_extension(mime_type) or ".jpg"
+    ext = ext.lstrip(".").replace("jpeg", "jpg")
+    return ext if ext in {"jpg", "png", "gif", "webp", "bmp"} else "jpg"
+
+
+def _download_wechat_image(session: requests.Session, image_url: str) -> tuple[bytes, str]:
+    current_url = image_url
+    response = None
+    for _ in range(_WECHAT_IMAGE_REDIRECT_LIMIT + 1):
+        safe, reason = is_ssrf_safe_url(current_url)
+        if not safe:
+            raise ValueError(f"image URL rejected: {reason}")
+
+        response = session.get(
+            current_url,
+            headers={
+                "User-Agent": _WECHAT_USER_AGENT,
+                "Referer": "https://mp.weixin.qq.com/",
+                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            },
+            timeout=_WECHAT_IMAGE_TIMEOUT,
+            stream=True,
+            allow_redirects=False,
+        )
+        if response.is_redirect or response.is_permanent_redirect:
+            location = response.headers.get("Location", "")
+            response.close()
+            if not location:
+                raise ValueError("image redirect missing location")
+            current_url = urljoin(current_url, location)
+            continue
+        break
+    else:
+        raise ValueError("image exceeded redirect limit")
+
+    if response is None:
+        raise ValueError("image request failed before response")
+
+    try:
+        response.raise_for_status()
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > _WECHAT_IMAGE_MAX_BYTES:
+                raise ValueError("image exceeded max size")
+            chunks.append(chunk)
+        return b"".join(chunks), response.headers.get("Content-Type", "")
+    finally:
+        response.close()
+
+
+def _register_wechat_image(
+    *,
+    session: requests.Session,
+    image_url: str,
+    prefix: str,
+    seq: int,
+    seen_urls: dict[str, str],
+    images: dict[str, str],
+) -> str:
+    if image_url in seen_urls:
+        return seen_urls[image_url]
+
+    data, content_type = _download_wechat_image(session, image_url)
+    ext = _image_ext(image_url, content_type)
+    digest = hashlib.sha1(image_url.encode("utf-8")).hexdigest()[:8]
+    rel = f"images/{prefix}_{seq:03d}_{digest}.{ext}"
+    images[rel] = base64.b64encode(data).decode("ascii")
+    seen_urls[image_url] = rel
+    return rel
+
+
 def extract_wechat_article_document(
     html: str,
     url: str,
@@ -260,6 +353,13 @@ def extract_wechat_article_document(
         for node in article.select(selector):
             node.decompose()
 
+    images: dict[str, str] = {}
+    seen_urls: dict[str, str] = {}
+    image_seq = 0
+    background_seq = 0
+    background_paths: list[str] = []
+    session = requests.Session()
+
     for img in article.find_all("img"):
         src = (
             img.get("data-src")
@@ -270,8 +370,43 @@ def extract_wechat_article_document(
         )
         src = _normalize_image_url(src, url)
         if src:
-            img["src"] = src
+            try:
+                image_seq += 1
+                img["src"] = _register_wechat_image(
+                    session=session,
+                    image_url=src,
+                    prefix="image",
+                    seq=image_seq,
+                    seen_urls=seen_urls,
+                    images=images,
+                )
+            except Exception as exc:
+                image_seq -= 1
+                logger.warning("Failed to inline WeChat image %s: %s", src, exc)
+                img["src"] = src
         img["alt"] = normalize_text(img.get("alt") or img.get("data-w") or "")
+
+    for node in article.select("[style]"):
+        style = node.get("style") or ""
+        for match in re.findall(r"url\((.*?)\)", style):
+            bg_url = _normalize_image_url(match.strip("\"' "), url)
+            if not bg_url.startswith(("http://", "https://")):
+                continue
+            try:
+                background_seq += 1
+                background_paths.append(
+                    _register_wechat_image(
+                        session=session,
+                        image_url=bg_url,
+                        prefix="background",
+                        seq=background_seq,
+                        seen_urls=seen_urls,
+                        images=images,
+                    )
+                )
+            except Exception as exc:
+                background_seq -= 1
+                logger.warning("Failed to inline WeChat background image %s: %s", bg_url, exc)
 
     body_md = markdownify(
         str(article),
@@ -286,12 +421,17 @@ def extract_wechat_article_document(
     parts = []
     if title:
         parts.append(f"# {title}")
-    meta_line = " · ".join(
+    meta_line = " | ".join(
         part for part in (account, author, publish_time) if part
     )
     if meta_line:
         parts.append(meta_line)
     parts.append(body_md)
+    if background_paths:
+        parts.append(
+            "## Saved Background Images\n\n"
+            + "\n\n".join(f"![background]({path})" for path in background_paths)
+        )
     content = _clean_markdown("\n\n".join(parts))
 
     if markdown_visible_len(content) < _WECHAT_MIN_ARTICLE_TEXT_LEN:
@@ -317,7 +457,11 @@ def extract_wechat_article_document(
     if publish_time:
         metadata["publish_time"] = publish_time
 
-    return Document(content=content, metadata=metadata)
+    metadata["inline_images"] = str(image_seq)
+    metadata["background_images"] = str(background_seq)
+    metadata["total_unique_images"] = str(len(images))
+
+    return Document(content=content, images=images, metadata=metadata)
 
 
 async def wait_for_rendered_content(page: Page) -> None:
