@@ -123,7 +123,18 @@ class DocReaderHTTPHandler(BaseHTTPRequestHandler):
 
             with request_id_context(request_id):
                 url = payload.get("url") or ""
-                if url:
+                html = payload.get("html") or ""
+                if html:
+                    base_url = payload.get("base_url") or url
+                    logger.info("HTTP Read(HTML): base_url=%s, size=%d chars", redact_url_for_log(base_url), len(html))
+                    result = self.parser.parse_html(
+                        html,
+                        base_url,
+                        payload.get("title") or "",
+                        parser_engine=parser_engine,
+                        engine_overrides=engine_overrides,
+                    )
+                elif url:
                     logger.info("HTTP Read(URL): url=%s", redact_url_for_log(url))
                     result = self.parser.parse_url(
                         url,

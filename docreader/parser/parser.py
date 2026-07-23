@@ -3,7 +3,17 @@ from typing import Any, Optional
 
 from docreader.models.document import Document
 from docreader.parser.registry import registry
-from docreader.parser.web_parser import WebParser, redact_url_for_log
+from docreader.parser.web_parser import (
+    WebParser,
+    build_visible_text_fallback,
+    extract_markdown_from_html,
+    extract_wechat_article_document,
+    has_wechat_article_root,
+    is_wechat_article_url,
+    page_title_from_html,
+    redact_url_for_log,
+    visible_text_from_html,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,3 +117,49 @@ class Parser:
             len(result.content),
         )
         return result
+
+    def parse_html(
+        self,
+        html: str,
+        base_url: str,
+        title: str,
+        parser_engine: Optional[str] = None,
+        engine_overrides: Optional[dict[str, Any]] = None,
+    ) -> Document:
+        """Parse browser-captured HTML to markdown without fetching the page URL."""
+        _ = parser_engine
+        _ = engine_overrides
+        logger.info(
+            "Parsing HTML snapshot: base_url=%s, title=%s, size=%d chars",
+            redact_url_for_log(base_url),
+            title,
+            len(html or ""),
+        )
+
+        if is_wechat_article_url(base_url) or has_wechat_article_root(html):
+            doc = extract_wechat_article_document(
+                html,
+                base_url,
+                fallback_title=title,
+                download_images=False,
+            )
+            if doc is not None:
+                doc.metadata["html_snapshot"] = "true"
+                return doc
+
+        markdown = extract_markdown_from_html(html)
+        page_title = page_title_from_html(html) or title
+        if not markdown:
+            markdown = build_visible_text_fallback(
+                visible_text_from_html(html),
+                page_title,
+            )
+        if not markdown:
+            return Document(metadata={"html_snapshot": "true"})
+
+        metadata = {"html_snapshot": "true"}
+        if base_url:
+            metadata["source_url"] = base_url
+        if page_title:
+            metadata["title"] = page_title
+        return Document(content=markdown, metadata=metadata)

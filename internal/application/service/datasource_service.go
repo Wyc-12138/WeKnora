@@ -950,6 +950,7 @@ func (s *DataSourceService) ingestItem(ctx context.Context, ds *types.DataSource
 			tagIDs, // auto-tag from data source
 			channel,
 			nil,
+			nil,
 		)
 		return isUpdate, err
 	}

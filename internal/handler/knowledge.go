@@ -474,6 +474,9 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 		TagIDs           []string                         `json:"tag_ids"`
 		Channel          string                           `json:"channel"`
 		ProcessConfig    *types.KnowledgeProcessOverrides `json:"process_config"`
+		HTML             string                           `json:"html"`
+		HTMLSnapshot     string                           `json:"html_snapshot"`
+		BaseURL          string                           `json:"base_url"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		logger.Error(ctx, "Failed to parse URL request", err)
@@ -499,10 +502,19 @@ func (h *KnowledgeHandler) CreateKnowledgeFromURL(c *gin.Context) {
 		secutils.SanitizeForLog(kbID),
 		secutils.SanitizeForLog(req.URL),
 	)
+	var htmlSnapshot *types.HTMLSnapshotInput
+	if html := strings.TrimSpace(firstNonEmpty(req.HTML, req.HTMLSnapshot)); html != "" {
+		htmlSnapshot = &types.HTMLSnapshotInput{
+			HTML:    html,
+			BaseURL: firstNonEmpty(req.BaseURL, req.URL),
+			Title:   req.Title,
+		}
+		logger.Infof(ctx, "Received browser HTML snapshot for URL import: size=%d bytes", len([]byte(html)))
+	}
 
 	// Create knowledge entry from the URL
 	knowledge, err := h.kgService.CreateKnowledgeFromURL(
-		ctx, kbID, req.URL, req.FileName, req.FileType, req.EnableMultimodel, req.Title, req.TagIDs, req.Channel, req.ProcessConfig,
+		ctx, kbID, req.URL, req.FileName, req.FileType, req.EnableMultimodel, req.Title, req.TagIDs, req.Channel, req.ProcessConfig, htmlSnapshot,
 	)
 	// Check for duplicate knowledge error
 	if err != nil {
@@ -2330,6 +2342,15 @@ func sliceContains(ss []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 type batchReparseKnowledgeRequest struct {

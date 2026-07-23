@@ -232,6 +232,15 @@ def _normalize_image_url(src: str, base_url: str) -> str:
     return urljoin(base_url, src)
 
 
+def _configured_proxies() -> dict[str, str] | None:
+    proxies = {}
+    if CONFIG.external_http_proxy:
+        proxies["http"] = CONFIG.external_http_proxy
+    if CONFIG.external_https_proxy:
+        proxies["https"] = CONFIG.external_https_proxy
+    return proxies or None
+
+
 def _image_ext(image_url: str, content_type: str) -> str:
     try:
         parsed = urlparse(image_url)
@@ -267,6 +276,7 @@ def _download_wechat_image(session: requests.Session, image_url: str) -> tuple[b
             timeout=_WECHAT_IMAGE_TIMEOUT,
             stream=True,
             allow_redirects=False,
+            proxies=_configured_proxies(),
         )
         if response.is_redirect or response.is_permanent_redirect:
             location = response.headers.get("Location", "")
@@ -323,6 +333,7 @@ def extract_wechat_article_document(
     html: str,
     url: str,
     fallback_title: str = "",
+    download_images: bool = True,
 ) -> Optional[Document]:
     """Extract a WeChat Official Account article into markdown."""
     soup = BeautifulSoup(html or "", "html.parser")
@@ -370,20 +381,23 @@ def extract_wechat_article_document(
         )
         src = _normalize_image_url(src, url)
         if src:
-            try:
-                image_seq += 1
-                img["src"] = _register_wechat_image(
-                    session=session,
-                    image_url=src,
-                    prefix="image",
-                    seq=image_seq,
-                    seen_urls=seen_urls,
-                    images=images,
-                )
-            except Exception as exc:
-                image_seq -= 1
-                logger.warning("Failed to inline WeChat image %s: %s", src, exc)
+            if not download_images:
                 img["src"] = src
+            else:
+                try:
+                    image_seq += 1
+                    img["src"] = _register_wechat_image(
+                        session=session,
+                        image_url=src,
+                        prefix="image",
+                        seq=image_seq,
+                        seen_urls=seen_urls,
+                        images=images,
+                    )
+                except Exception as exc:
+                    image_seq -= 1
+                    logger.warning("Failed to inline WeChat image %s: %s", src, exc)
+                    img["src"] = src
         img["alt"] = normalize_text(img.get("alt") or img.get("data-w") or "")
 
     for node in article.select("[style]"):
@@ -392,21 +406,24 @@ def extract_wechat_article_document(
             bg_url = _normalize_image_url(match.strip("\"' "), url)
             if not bg_url.startswith(("http://", "https://")):
                 continue
-            try:
-                background_seq += 1
-                background_paths.append(
-                    _register_wechat_image(
-                        session=session,
-                        image_url=bg_url,
-                        prefix="background",
-                        seq=background_seq,
-                        seen_urls=seen_urls,
-                        images=images,
+            if not download_images:
+                background_paths.append(bg_url)
+            else:
+                try:
+                    background_seq += 1
+                    background_paths.append(
+                        _register_wechat_image(
+                            session=session,
+                            image_url=bg_url,
+                            prefix="background",
+                            seq=background_seq,
+                            seen_urls=seen_urls,
+                            images=images,
+                        )
                     )
-                )
-            except Exception as exc:
-                background_seq -= 1
-                logger.warning("Failed to inline WeChat background image %s: %s", bg_url, exc)
+                except Exception as exc:
+                    background_seq -= 1
+                    logger.warning("Failed to inline WeChat background image %s: %s", bg_url, exc)
 
     body_md = markdownify(
         str(article),
@@ -457,9 +474,12 @@ def extract_wechat_article_document(
     if publish_time:
         metadata["publish_time"] = publish_time
 
+    if not download_images:
+        image_seq = len([img for img in article.find_all("img") if img.get("src")])
+        background_seq = len(background_paths)
     metadata["inline_images"] = str(image_seq)
     metadata["background_images"] = str(background_seq)
-    metadata["total_unique_images"] = str(len(images))
+    metadata["total_unique_images"] = str(len(images) if download_images else image_seq + background_seq)
 
     return Document(content=content, images=images, metadata=metadata)
 

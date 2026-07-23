@@ -66,7 +66,7 @@ func (p *WeKnoraCloudSignedDocumentReader) ListEngines(ctx context.Context, over
 	return []types.ParserEngineInfo{{
 		Name:        WeKnoraCloudEngineName,
 		Description: "WeKnoraCloud signed docreader",
-		FileTypes:   []string{"docx", "doc", "pdf", "md", "markdown", "xlsx", "xls", "pptx", "ppt"},
+		FileTypes:   []string{"docx", "doc", "pdf", "html", "htm", "md", "markdown", "xlsx", "xls", "pptx", "ppt"},
 		Available:   true,
 	}}, nil
 }
@@ -78,6 +78,8 @@ func (p *WeKnoraCloudSignedDocumentReader) Read(ctx context.Context, req *types.
 		FileName:  req.FileName,
 		FileType:  req.FileType,
 		URL:       req.URL,
+		HTML:      req.HTML,
+		BaseURL:   req.BaseURL,
 		Title:     req.Title,
 		RequestID: req.RequestID,
 		Config: &httpReadConfig{

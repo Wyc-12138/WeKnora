@@ -413,3 +413,12 @@ type KnowledgeCheckParams struct {
 	// Knowledge type
 	Type string
 }
+
+// HTMLSnapshotInput carries browser-captured page HTML for URL imports.
+// The backend stores it in object storage and parses the snapshot instead of
+// fetching the URL from the server.
+type HTMLSnapshotInput struct {
+	HTML    string
+	BaseURL string
+	Title   string
+}

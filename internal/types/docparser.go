@@ -9,6 +9,8 @@ type ReadRequest struct {
 	FileName              string
 	FileType              string
 	URL                   string
+	HTML                  string
+	BaseURL               string
 	Title                 string
 	ParserEngine          string
 	RequestID             string

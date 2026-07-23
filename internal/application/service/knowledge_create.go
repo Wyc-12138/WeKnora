@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -313,7 +315,7 @@ func isFileURL(rawURL, fileName, fileType string) bool {
 
 func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 	kbID string, rawURL string, fileName string, fileType string, enableMultimodel *bool, title string, tagIDs []string, channel string,
-	processOverrides *types.KnowledgeProcessOverrides,
+	processOverrides *types.KnowledgeProcessOverrides, htmlSnapshot *types.HTMLSnapshotInput,
 ) (*types.Knowledge, error) {
 	logger.Info(ctx, "Start creating knowledge from URL")
 	logger.Infof(ctx, "Knowledge base ID: %s, URL: %s", kbID, rawURL)
@@ -402,6 +404,21 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		UpdatedAt:        time.Now(),
 		EmbeddingModelID: kb.EmbeddingModelID,
 	}
+	if snapshotTitle := htmlSnapshotTitle(htmlSnapshot); title == "" && snapshotTitle != "" {
+		knowledge.Title = snapshotTitle
+	}
+	snapshotPath, snapshotBaseURL, err := s.storeURLHTMLSnapshot(ctx, kb, tenantID, knowledge.ID, url, htmlSnapshot)
+	if err != nil {
+		return nil, err
+	}
+	if snapshotPath != "" {
+		if err := setURLHTMLSnapshotMetadata(knowledge, snapshotPath, snapshotBaseURL, htmlSnapshotTitle(htmlSnapshot)); err != nil {
+			if deleteErr := s.resolveFileService(ctx, kb).DeleteFile(ctx, snapshotPath); deleteErr != nil {
+				logger.Warnf(ctx, "Failed to delete HTML snapshot after metadata error: %v", deleteErr)
+			}
+			return nil, err
+		}
+	}
 
 	// Save knowledge record
 	logger.Infof(ctx, "Saving knowledge record to database, ID: %s", knowledge.ID)
@@ -412,6 +429,11 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 
 	if err := s.repo.CreateKnowledge(ctx, knowledge); err != nil {
 		logger.Errorf(ctx, "Failed to create knowledge record: %v", err)
+		if snapshotPath != "" {
+			if deleteErr := s.resolveFileService(ctx, kb).DeleteFile(ctx, snapshotPath); deleteErr != nil {
+				logger.Warnf(ctx, "Failed to delete saved HTML snapshot after knowledge creation failed: %v", deleteErr)
+			}
+		}
 		return nil, err
 	}
 
@@ -436,6 +458,8 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		KnowledgeID:              knowledge.ID,
 		KnowledgeBaseID:          kbID,
 		URL:                      url,
+		HTMLSnapshotPath:         snapshotPath,
+		HTMLSnapshotBaseURL:      snapshotBaseURL,
 		EnableMultimodel:         enableMultimodelValue,
 		EnableQuestionGeneration: enableQuestionGeneration,
 		QuestionCount:            questionCount,
@@ -490,6 +514,103 @@ var allowedFileURLExtensions = map[string]bool{
 
 // maxFileURLSize is the maximum allowed file size for file URL import (10MB)
 const maxFileURLSize = 10 * 1024 * 1024
+
+const maxURLHTMLSnapshotSize = 10 * 1024 * 1024
+
+const (
+	metadataKeyHTMLSnapshotPath    = "html_snapshot_path"
+	metadataKeyHTMLSnapshotBaseURL = "html_snapshot_base_url"
+	metadataKeyHTMLSnapshotTitle   = "html_snapshot_title"
+	metadataKeyHTMLSnapshotSource  = "html_snapshot_source"
+)
+
+func htmlSnapshotTitle(snapshot *types.HTMLSnapshotInput) string {
+	if snapshot == nil {
+		return ""
+	}
+	return strings.TrimSpace(snapshot.Title)
+}
+
+func normalizeSnapshotBaseURL(rawURL string, snapshot *types.HTMLSnapshotInput) string {
+	if snapshot != nil && strings.TrimSpace(snapshot.BaseURL) != "" {
+		return strings.TrimSpace(snapshot.BaseURL)
+	}
+	return strings.TrimSpace(rawURL)
+}
+
+func gzipBytes(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+	if _, err := writer.Write(data); err != nil {
+		_ = writer.Close()
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func setURLHTMLSnapshotMetadata(knowledge *types.Knowledge, path, baseURL, title string) error {
+	metadata, err := knowledge.Metadata.Map()
+	if err != nil {
+		return err
+	}
+	metadata[metadataKeyHTMLSnapshotPath] = path
+	if strings.TrimSpace(baseURL) != "" {
+		metadata[metadataKeyHTMLSnapshotBaseURL] = strings.TrimSpace(baseURL)
+	}
+	if strings.TrimSpace(title) != "" {
+		metadata[metadataKeyHTMLSnapshotTitle] = strings.TrimSpace(title)
+	}
+	metadata[metadataKeyHTMLSnapshotSource] = "browser"
+	bytes, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	knowledge.Metadata = types.JSON(bytes)
+	return nil
+}
+
+func getURLHTMLSnapshotMetadata(knowledge *types.Knowledge) (path, baseURL string) {
+	if knowledge == nil {
+		return "", ""
+	}
+	metadata, err := knowledge.Metadata.Map()
+	if err != nil {
+		return "", ""
+	}
+	if v, ok := metadata[metadataKeyHTMLSnapshotPath].(string); ok {
+		path = strings.TrimSpace(v)
+	}
+	if v, ok := metadata[metadataKeyHTMLSnapshotBaseURL].(string); ok {
+		baseURL = strings.TrimSpace(v)
+	}
+	return path, baseURL
+}
+
+func (s *knowledgeService) storeURLHTMLSnapshot(
+	ctx context.Context, kb *types.KnowledgeBase, tenantID uint64, knowledgeID string, rawURL string, snapshot *types.HTMLSnapshotInput,
+) (string, string, error) {
+	if snapshot == nil || strings.TrimSpace(snapshot.HTML) == "" {
+		return "", "", nil
+	}
+	html := []byte(snapshot.HTML)
+	if len(html) > maxURLHTMLSnapshotSize {
+		return "", "", werrors.NewBadRequestError(
+			fmt.Sprintf("html snapshot exceeds %d MB", maxURLHTMLSnapshotSize/1024/1024))
+	}
+	compressed, err := gzipBytes(html)
+	if err != nil {
+		return "", "", fmt.Errorf("gzip html snapshot: %w", err)
+	}
+	baseURL := normalizeSnapshotBaseURL(rawURL, snapshot)
+	filePath, err := s.resolveFileService(ctx, kb).SaveBytes(ctx, compressed, tenantID, knowledgeID+".html.gz", false)
+	if err != nil {
+		return "", "", fmt.Errorf("save html snapshot: %w", err)
+	}
+	return filePath, baseURL, nil
+}
 
 // extractFileNameFromURL extracts the filename from a URL path
 func extractFileNameFromURL(rawURL string) string {

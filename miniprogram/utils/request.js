@@ -250,6 +250,10 @@ function createKnowledgeFromURL(knowledgeBaseId, url, options = false) {
     if (options.title) payload.title = options.title;
     if (options.fileName) payload.file_name = options.fileName;
     if (options.fileType) payload.file_type = options.fileType;
+    if (options.channel) payload.channel = options.channel;
+    if (options.html) payload.html = options.html;
+    if (options.htmlSnapshot) payload.html_snapshot = options.htmlSnapshot;
+    if (options.baseUrl) payload.base_url = options.baseUrl;
   }
   return request(`/api/v1/knowledge-bases/${knowledgeBaseId}/knowledge/url`, {
     method: "POST",

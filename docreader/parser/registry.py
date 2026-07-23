@@ -7,6 +7,7 @@ from docreader.parser.docx2_parser import Docx2Parser
 from docreader.parser.epub_parser import EPUBParser
 from docreader.parser.excel_parser import ExcelParser
 from docreader.parser.image_parser import ImageParser
+from docreader.parser.html_parser import HTMLParser
 from docreader.parser.markdown_parser import MarkdownParser
 from docreader.parser.markitdown_parser import MarkitdownParser
 from docreader.parser.mhtml_parser import MHTMLParser
@@ -129,6 +130,8 @@ def _build_default_registry() -> ParserEngineRegistry:
             "docx": Docx2Parser,
             "doc": DocParser,
             "pdf": PDFParser,
+            "html": HTMLParser,
+            "htm": HTMLParser,
             "md": MarkdownParser,
             "markdown": MarkdownParser,
             "xlsx": ExcelParser,

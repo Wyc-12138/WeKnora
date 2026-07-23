@@ -1,6 +1,7 @@
 package service
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -2217,11 +2218,14 @@ func (s *knowledgeService) ReparseKnowledge(
 		}
 
 		lang, _ := types.LanguageFromContext(ctx)
+		htmlSnapshotPath, htmlSnapshotBaseURL := getURLHTMLSnapshotMetadata(existing)
 		taskPayload := types.DocumentProcessPayload{
 			TenantID:                 tenantID,
 			KnowledgeID:              existing.ID,
 			KnowledgeBaseID:          existing.KnowledgeBaseID,
 			URL:                      existing.Source,
+			HTMLSnapshotPath:         htmlSnapshotPath,
+			HTMLSnapshotBaseURL:      htmlSnapshotBaseURL,
 			EnableMultimodel:         enableMultimodel,
 			EnableQuestionGeneration: enableQuestionGeneration,
 			QuestionCount:            questionCount,
@@ -2901,7 +2905,12 @@ func (s *knowledgeService) ProcessDocument(ctx context.Context, t *asynq.Task) e
 		}
 	} else if payload.URL != "" {
 		// URL import
-		if docparser.IsWeChatArticleURL(payload.URL) {
+		if payload.HTMLSnapshotPath == "" {
+			payload.HTMLSnapshotPath, payload.HTMLSnapshotBaseURL = getURLHTMLSnapshotMetadata(knowledge)
+		}
+		if payload.HTMLSnapshotPath != "" {
+			convertResult, err = s.convert(ctx, payload, kb, knowledge, eff, isLastRetry)
+		} else if docparser.IsWeChatArticleURL(payload.URL) {
 			s.beginStage(ctx, knowledge.ID, types.StageDocReader, types.JSONMap{
 				"is_url":            true,
 				"url":               payload.URL,
@@ -3138,6 +3147,10 @@ func (s *knowledgeService) convert(
 	if payload.URL != "" {
 		docInput["url"] = payload.URL
 	}
+	if payload.HTMLSnapshotPath != "" {
+		docInput["html_snapshot"] = true
+		docInput["html_snapshot_path"] = payload.HTMLSnapshotPath
+	}
 	s.beginStage(ctx, knowledge.ID, types.StageDocReader, docInput)
 	isURL := payload.URL != ""
 	fileType := payload.FileType
@@ -3165,6 +3178,10 @@ func (s *knowledgeService) convert(
 	if isURL {
 		parserEngine = eff.ChunkingConfig.ResolveParserEngine("url")
 	}
+	if payload.HTMLSnapshotPath != "" {
+		fileType = "html"
+		parserEngine = "builtin"
+	}
 
 	logger.Infof(ctx, "[convert] kb=%s fileType=%s isURL=%v engine=%q rules=%+v",
 		kb.ID, fileType, isURL, parserEngine, eff.ChunkingConfig.ParserEngineRules)
@@ -3184,10 +3201,26 @@ func (s *knowledgeService) convert(
 
 	req := &types.ReadRequest{
 		URL:                   payload.URL,
+		BaseURL:               payload.HTMLSnapshotBaseURL,
 		Title:                 knowledge.Title,
 		ParserEngine:          parserEngine,
 		RequestID:             payload.RequestId,
 		ParserEngineOverrides: mergedOverrides,
+	}
+	if payload.HTMLSnapshotPath != "" {
+		html, err := s.readGzippedHTMLSnapshot(ctx, kb, payload.HTMLSnapshotPath)
+		if err != nil {
+			s.failStage(ctx, knowledge.ID, types.StageDocReader,
+				werrors.ErrCodeDocReaderParseFailed, "failed to read HTML snapshot", err)
+			return s.failKnowledge(ctx, knowledge, isLastRetry, "failed to read HTML snapshot: %v", err)
+		}
+		req.HTML = html
+		req.FileContent = []byte(html)
+		req.FileName = knowledge.ID + ".html"
+		req.FileType = "html"
+		if req.BaseURL == "" {
+			req.BaseURL = payload.URL
+		}
 	}
 
 	if !isURL {
@@ -3255,6 +3288,28 @@ func (s *knowledgeService) convert(
 	}
 	s.endStage(ctx, knowledge.ID, types.StageDocReader, docOutput)
 	return result, nil
+}
+
+func (s *knowledgeService) readGzippedHTMLSnapshot(
+	ctx context.Context, kb *types.KnowledgeBase, snapshotPath string,
+) (string, error) {
+	reader, err := s.resolveFileServiceForPath(ctx, kb, snapshotPath).GetFile(ctx, snapshotPath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return "", err
+	}
+	defer gzipReader.Close()
+
+	data, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // callDocReaderWithTimeout wraps the DocReader RPC in a child context whose

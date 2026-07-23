@@ -115,16 +115,41 @@ func (p *GRPCDocumentReader) Read(ctx context.Context, req *types.ReadRequest) (
 		return nil, errNotConnected
 	}
 
+	fileContent := req.FileContent
+	fileName := req.FileName
+	fileType := req.FileType
+	rawURL := req.URL
+	overrides := req.ParserEngineOverrides
+	if req.HTML != "" {
+		fileContent = []byte(req.HTML)
+		if fileName == "" {
+			fileName = "snapshot.html"
+		}
+		fileType = "html"
+		rawURL = ""
+		copied := make(map[string]string, len(overrides)+2)
+		for key, value := range overrides {
+			copied[key] = value
+		}
+		overrides = copied
+		if req.BaseURL != "" {
+			overrides["base_url"] = req.BaseURL
+		}
+		if req.Title != "" {
+			overrides["title"] = req.Title
+		}
+	}
+
 	protoReq := &proto.ReadRequest{
-		FileContent: req.FileContent,
-		FileName:    req.FileName,
-		FileType:    req.FileType,
-		Url:         req.URL,
+		FileContent: fileContent,
+		FileName:    fileName,
+		FileType:    fileType,
+		Url:         rawURL,
 		Title:       req.Title,
 		RequestId:   req.RequestID,
 		Config: &proto.ReadConfig{
 			ParserEngine:          req.ParserEngine,
-			ParserEngineOverrides: req.ParserEngineOverrides,
+			ParserEngineOverrides: overrides,
 		},
 	}
 

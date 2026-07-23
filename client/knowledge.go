@@ -230,6 +230,14 @@ type CreateKnowledgeFromURLRequest struct {
 	EnableMultimodel *bool `json:"enable_multimodel,omitempty"`
 	// Title is the optional title for the knowledge entry
 	Title string `json:"title,omitempty"`
+	// HTML is an optional browser-captured page snapshot. When present, the
+	// server stores and parses this HTML instead of crawling URL from backend.
+	HTML string `json:"html,omitempty"`
+	// HTMLSnapshot is an alias for HTML kept for API callers that prefer an
+	// explicit snapshot field name.
+	HTMLSnapshot string `json:"html_snapshot,omitempty"`
+	// BaseURL is the original page URL used to resolve relative links in HTML.
+	BaseURL string `json:"base_url,omitempty"`
 	// TagID is the optional tag ID to associate with the knowledge entry
 	TagID string `json:"tag_id,omitempty"`
 	// Channel identifies the ingestion channel (e.g. "web", "browser_extension", "api")

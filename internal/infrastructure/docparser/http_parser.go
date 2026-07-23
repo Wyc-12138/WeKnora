@@ -33,6 +33,8 @@ type httpReadRequest struct {
 	FileName    string          `json:"file_name,omitempty"`
 	FileType    string          `json:"file_type,omitempty"`
 	URL         string          `json:"url,omitempty"`
+	HTML        string          `json:"html,omitempty"`
+	BaseURL     string          `json:"base_url,omitempty"`
 	Title       string          `json:"title,omitempty"`
 	Config      *httpReadConfig `json:"config,omitempty"`
 	RequestID   string          `json:"request_id,omitempty"`
@@ -192,6 +194,8 @@ func (p *HTTPDocumentReader) Read(ctx context.Context, req *types.ReadRequest) (
 		FileName:  req.FileName,
 		FileType:  req.FileType,
 		URL:       req.URL,
+		HTML:      req.HTML,
+		BaseURL:   req.BaseURL,
 		Title:     req.Title,
 		RequestID: req.RequestID,
 		Config: &httpReadConfig{

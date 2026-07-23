@@ -64,6 +64,9 @@ func (s *createKnowledgeFileKBServiceStub) GetKnowledgeBaseByID(
 type createKnowledgeFileServiceStub struct {
 	saveErr              error
 	saveCalls            int
+	saveBytesCalls       int
+	savedBytes           []byte
+	savedBytesFileName   string
 	savedWithKnowledgeID string
 	deleteCalls          int
 	deletedPath          string
@@ -94,7 +97,10 @@ func (s *createKnowledgeFileServiceStub) SaveBytes(
 	fileName string,
 	temp bool,
 ) (string, error) {
-	return "", errors.New("not implemented")
+	s.saveBytesCalls++
+	s.savedBytes = append([]byte(nil), data...)
+	s.savedBytesFileName = fileName
+	return "stored/" + fileName, nil
 }
 
 func (s *createKnowledgeFileServiceStub) GetFile(ctx context.Context, filePath string) (io.ReadCloser, error) {
@@ -267,6 +273,51 @@ func TestCreateKnowledgeFromFile_PersistsProcessOverrides(t *testing.T) {
 	metadataMap, err := repo.createdKnowledge.Metadata.Map()
 	require.NoError(t, err)
 	require.Equal(t, "test", metadataMap["source"])
+}
+
+func TestCreateKnowledgeFromURLStoresHTMLSnapshot(t *testing.T) {
+	t.Parallel()
+
+	repo := &createKnowledgeFileRepoStub{}
+	fileSvc := &createKnowledgeFileServiceStub{}
+	task := &createKnowledgeTaskEnqueuerStub{}
+	svc := &knowledgeService{
+		repo:      repo,
+		kbService: &createKnowledgeFileKBServiceStub{kb: &types.KnowledgeBase{ID: "kb-1"}},
+		fileSvc:   fileSvc,
+		task:      task,
+	}
+
+	knowledge, err := svc.CreateKnowledgeFromURL(
+		newCreateKnowledgeFileContext(),
+		"kb-1",
+		"https://mp.weixin.qq.com/s/example",
+		"",
+		"",
+		nil,
+		"Snapshot Title",
+		nil,
+		types.ChannelBrowserExtension,
+		nil,
+		&types.HTMLSnapshotInput{
+			HTML:    "<html><body><div id='js_content'>hello from browser html snapshot</div></body></html>",
+			BaseURL: "https://mp.weixin.qq.com/s/example",
+			Title:   "Snapshot Title",
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, knowledge)
+	require.Equal(t, 1, fileSvc.saveBytesCalls)
+	require.Equal(t, knowledge.ID+".html.gz", fileSvc.savedBytesFileName)
+	require.Equal(t, 1, repo.createCalls)
+	require.Equal(t, 1, task.calls)
+
+	metadata, err := repo.createdKnowledge.Metadata.Map()
+	require.NoError(t, err)
+	require.Equal(t, "stored/"+knowledge.ID+".html.gz", metadata[metadataKeyHTMLSnapshotPath])
+	require.Equal(t, "https://mp.weixin.qq.com/s/example", metadata[metadataKeyHTMLSnapshotBaseURL])
+	require.Equal(t, "browser", metadata[metadataKeyHTMLSnapshotSource])
 }
 
 func newCreateKnowledgeFileContext() context.Context {
