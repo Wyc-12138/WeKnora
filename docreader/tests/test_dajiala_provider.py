@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 from docreader.utils.dajiala_provider import (
     fetch_dajiala_article,
     fetch_dajiala_article_with_diagnostics,
+    normalize_wechat_article_url_for_dajiala,
 )
 
 
@@ -87,6 +88,46 @@ class TestDajialaProvider(unittest.TestCase):
     def test_fetch_dajiala_article_without_key_returns_none(self):
         doc = fetch_dajiala_article("https://mp.weixin.qq.com/s/example", api_key="")
         self.assertIsNone(doc)
+
+    def test_normalize_wechat_long_url_for_dajiala(self):
+        url = (
+            "https://mp.weixin.qq.com/s?__biz=MzA3MDAwMDcxNQ==&mid=2652053260"
+            "&idx=1&sn=065b4cbe9ec6d06b8a7fef454473d772"
+            "&chksm=8459fd00a92eea1ba219bbd5f12a7f567e39211a32c2ed80d64fba359d16d249750bfc1cfef4"
+            "&scene=90&sessionid=1784798381&exportkey=secret&pass_ticket=ticket"
+        )
+
+        normalized = normalize_wechat_article_url_for_dajiala(url)
+
+        self.assertIn("__biz=MzA3MDAwMDcxNQ%3D%3D", normalized)
+        self.assertIn("mid=2652053260", normalized)
+        self.assertIn("idx=1", normalized)
+        self.assertIn("sn=065b4cbe9ec6d06b8a7fef454473d772", normalized)
+        self.assertIn("chksm=8459fd00a92eea1ba219bbd5f12a7f567e39211a32c2ed80d64fba359d16d249750bfc1cfef4", normalized)
+        self.assertNotIn("scene=", normalized)
+        self.assertNotIn("sessionid=", normalized)
+        self.assertNotIn("exportkey=", normalized)
+        self.assertNotIn("pass_ticket=", normalized)
+
+    @patch("docreader.utils.dajiala_provider.requests.post")
+    def test_fetch_dajiala_article_posts_normalized_long_url(self, post):
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"code": 101, "msg": "article deleted", "data": {}}
+        post.return_value = response
+        url = (
+            "https://mp.weixin.qq.com/s?__biz=MzA3MDAwMDcxNQ==&mid=2652053260"
+            "&idx=1&sn=065b4cbe9ec6d06b8a7fef454473d772&sessionid=1784798381"
+            "&exportkey=secret&pass_ticket=ticket"
+        )
+
+        fetch_dajiala_article(url, api_key="jzl_test")
+
+        sent_url = post.call_args.kwargs["json"]["url"]
+        self.assertIn("mid=2652053260", sent_url)
+        self.assertNotIn("sessionid=", sent_url)
+        self.assertNotIn("exportkey=", sent_url)
+        self.assertNotIn("pass_ticket=", sent_url)
 
 
 if __name__ == "__main__":

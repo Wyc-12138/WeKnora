@@ -3,8 +3,11 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
 from urllib.parse import urljoin
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -19,6 +22,8 @@ logger = logging.getLogger(__name__)
 _DAJIALA_PATH = "/fbmain/monitor/v3/article_html"
 _DAJIALA_TIMEOUT = (5, 30)
 _CONTENT_MIN_VISIBLE_LEN = 80
+_WECHAT_HOST = "mp.weixin.qq.com"
+_WECHAT_ARTICLE_QUERY_KEYS = ("__biz", "mid", "idx", "sn", "chksm")
 
 
 def _diagnostic(endpoint: str) -> dict[str, Any]:
@@ -43,6 +48,29 @@ def _string_value(data: dict[str, Any], key: str) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def normalize_wechat_article_url_for_dajiala(article_url: str) -> str:
+    """Drop volatile WeChat WebView query params before calling Dajiala."""
+    try:
+        parsed = urlparse(article_url)
+    except Exception:
+        return article_url
+    if parsed.scheme not in {"http", "https"} or parsed.hostname != _WECHAT_HOST:
+        return article_url
+    if parsed.path.startswith("/s/"):
+        return urlunparse(parsed._replace(fragment=""))
+
+    query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    kept = [(key, value) for key, value in query_pairs if key in _WECHAT_ARTICLE_QUERY_KEYS]
+    if not kept:
+        return article_url
+    return urlunparse(
+        parsed._replace(
+            query=urlencode(kept, doseq=True),
+            fragment="",
+        )
+    )
 
 
 def _html_to_markdown(html: str) -> str:
@@ -121,8 +149,10 @@ def fetch_dajiala_article_with_diagnostics(
 ) -> tuple[Document | None, dict[str, Any]]:
     api_key = (api_key or "").strip()
     verifycode = (verifycode or "").strip()
+    request_url = normalize_wechat_article_url_for_dajiala(article_url)
     endpoint = urljoin(base_url.rstrip("/") + "/", _DAJIALA_PATH.lstrip("/"))
     diag = _diagnostic(endpoint)
+    diag["url_normalized"] = request_url != article_url
     if not api_key:
         diag["attempted"] = False
         diag["error"] = "missing_api_key"
@@ -138,7 +168,7 @@ def fetch_dajiala_article_with_diagnostics(
         response = requests.post(
             endpoint,
             headers={"Content-Type": "application/json"},
-            json={"url": article_url, "key": api_key, "verifycode": verifycode},
+            json={"url": request_url, "key": api_key, "verifycode": verifycode},
             timeout=_DAJIALA_TIMEOUT,
         )
     except Exception as exc:
@@ -185,7 +215,7 @@ def fetch_dajiala_article_with_diagnostics(
         }
     )
 
-    doc = _build_document(data, article_url)
+    doc = _build_document(data, request_url)
     if doc is None:
         logger.warning("Dajiala article response has no usable content")
         diag["error"] = "no_usable_content"
