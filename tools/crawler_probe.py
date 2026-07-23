@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docreader.config import CONFIG
 from docreader.utils.browser_crawler import BrowserCrawlConfig, crawl
-from docreader.utils.redfox_provider import fetch_redfox_article_with_diagnostics
+from docreader.utils.dajiala_provider import fetch_dajiala_article_with_diagnostics
 
 
 def _is_wechat_article_url(url: str) -> bool:
@@ -100,16 +100,17 @@ def main() -> None:
         respect_robots=args.respect_robots,
         allow_private_net=args.allow_private_net,
     )
-    redfox_doc = None
-    redfox_diag = None
-    if _is_wechat_article_url(args.url) and CONFIG.wechat_redfox_enabled and CONFIG.redfox_api_key:
-        redfox_doc, redfox_diag = fetch_redfox_article_with_diagnostics(
+    dajiala_doc = None
+    dajiala_diag = None
+    if _is_wechat_article_url(args.url) and CONFIG.dajiala_api_key:
+        dajiala_doc, dajiala_diag = fetch_dajiala_article_with_diagnostics(
             args.url,
-            api_key=CONFIG.redfox_api_key,
-            base_url=CONFIG.redfox_base_url,
+            api_key=CONFIG.dajiala_api_key,
+            verifycode=CONFIG.dajiala_verifycode,
+            base_url=CONFIG.dajiala_base_url,
         )
 
-    if redfox_doc is not None:
+    if dajiala_doc is not None:
         output = {
             "prototype": "crawler_probe",
             "seed_url": args.url,
@@ -123,34 +124,34 @@ def main() -> None:
                 "executable_path": args.executable_path,
                 "respect_robots": args.respect_robots,
                 "allow_private_net": args.allow_private_net,
-                "redfox_enabled": True,
+                "dajiala_enabled": True,
             },
-            "redfox": redfox_diag,
+            "dajiala": dajiala_diag,
             "summary": {"ok": 1, "blocked": 0, "failed": 0, "visited": 1, "queued": 1},
             "pages": [
                 {
                     "url": args.url,
                     "depth": 0,
                     "status": "ok",
-                    "title": redfox_doc.metadata.get("title", ""),
+                    "title": dajiala_doc.metadata.get("title", ""),
                     "http_status": 200,
-                    "markdown": redfox_doc.content,
-                    "markdown_length": len(redfox_doc.content),
-                    "visible_text_length": len(redfox_doc.content),
+                    "markdown": dajiala_doc.content,
+                    "markdown_length": len(dajiala_doc.content),
+                    "visible_text_length": len(dajiala_doc.content),
                     "discovered_links": [],
                     "block_reason": "",
-                    "method": "redfox",
+                    "method": "dajiala",
                     "error": "",
                     "elapsed_ms": 0,
-                    "metadata": redfox_doc.metadata,
+                    "metadata": dajiala_doc.metadata,
                 }
             ],
         }
     else:
         output = asyncio.run(crawl(args.url, config))
-        if redfox_diag is not None:
-            output["redfox"] = redfox_diag
-            output.setdefault("config", {})["redfox_enabled"] = True
+        if dajiala_diag is not None:
+            output["dajiala"] = dajiala_diag
+            output.setdefault("config", {})["dajiala_enabled"] = True
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")

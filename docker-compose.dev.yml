@@ -263,9 +263,9 @@ services:
       - DOCREADER_WEB_BROWSER_EXECUTABLE_PATH=${DOCREADER_WEB_BROWSER_EXECUTABLE_PATH:-}
       - DOCREADER_EXTERNAL_HTTP_PROXY=${DOCREADER_EXTERNAL_HTTP_PROXY:-}
       - DOCREADER_EXTERNAL_HTTPS_PROXY=${DOCREADER_EXTERNAL_HTTPS_PROXY:-}
-      - DOCREADER_WECHAT_REDFOX_ENABLED=${DOCREADER_WECHAT_REDFOX_ENABLED:-true}
-      - REDFOX_API_KEY=${REDFOX_API_KEY:-}
-      - REDFOX_BASE_URL=${REDFOX_BASE_URL:-https://redfox.hk}
+      - DAJIALA_API_KEY=${DAJIALA_API_KEY:-}
+      - DAJIALA_VERIFYCODE=${DAJIALA_VERIFYCODE:-}
+      - DAJIALA_BASE_URL=${DAJIALA_BASE_URL:-https://www.dajiala.com}
       - DOCREADER_PDF_RENDER_MAX_WORKERS=${DOCREADER_PDF_RENDER_MAX_WORKERS:-1}
       - DOCREADER_PDF_RENDER_DPI=${DOCREADER_PDF_RENDER_DPI:-200}
       - DOCREADER_PDF_JPEG_QUALITY=${DOCREADER_PDF_JPEG_QUALITY:-90}
@@ -277,37 +277,6 @@ services:
       - GRPC_AUTH_TOKEN=${GRPC_AUTH_TOKEN:-}
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - WeKnora-network-dev
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  # Python HTTP sidecar for local WeChat Official Account article extraction.
-  wechat-article-reader:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.docreader
-    image: wechatopenai/weknora-docreader:${WEKNORA_VERSION:-latest}
-    container_name: WeKnora-wechat-article-reader-dev
-    ports:
-      - "${WECHAT_ARTICLE_READER_PORT:-18080}:8080"
-    environment:
-      - TZ=${TZ:-Asia/Shanghai}
-      - DOCREADER_SERVE_HTTP=true
-      - DOCREADER_HTTP_PORT=8080
-      - DOCREADER_WEB_BROWSER=${DOCREADER_WEB_BROWSER:-chromium}
-      - DOCREADER_WEB_BROWSER_CHANNEL=${DOCREADER_WEB_BROWSER_CHANNEL:-}
-      - DOCREADER_WEB_BROWSER_EXECUTABLE_PATH=${DOCREADER_WEB_BROWSER_EXECUTABLE_PATH:-}
-      - DOCREADER_WECHAT_REDFOX_ENABLED=${DOCREADER_WECHAT_REDFOX_ENABLED:-true}
-      - REDFOX_API_KEY=${REDFOX_API_KEY:-}
-      - REDFOX_BASE_URL=${REDFOX_BASE_URL:-https://redfox.hk}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3

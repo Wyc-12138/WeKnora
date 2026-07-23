@@ -113,9 +113,6 @@ services:
       - MILVUS_METRIC_TYPE=${MILVUS_METRIC_TYPE:-IP}
       - DOCREADER_ADDR=${DOCREADER_ADDR:-docreader:50051}
       - DOCREADER_TRANSPORT=${DOCREADER_TRANSPORT:-grpc}
-      - WECHAT_ARTICLE_PYTHON_ADDR=${WECHAT_ARTICLE_PYTHON_ADDR:-http://wechat-article-reader:8080}
-      - WECHAT_ARTICLE_PYTHON_ENABLED=${WECHAT_ARTICLE_PYTHON_ENABLED:-true}
-      - WECHAT_ARTICLE_PYTHON_FALLBACK=${WECHAT_ARTICLE_PYTHON_FALLBACK:-true}
       # docreader gRPC TLS / 认证（客户端侧）
       - GRPC_TLS_ENABLED=${GRPC_TLS_ENABLED:-false}
       - GRPC_TLS_CERT=${GRPC_TLS_CERT:-}
@@ -216,43 +213,6 @@ services:
         condition: service_healthy
       docreader:
         condition: service_healthy
-      wechat-article-reader:
-        condition: service_healthy
-    networks:
-      - WeKnora-network
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  # Python HTTP sidecar for WeChat Official Account article extraction.
-  wechat-article-reader:
-    image: wechatopenai/weknora-docreader:${WEKNORA_VERSION:-latest}
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.docreader
-      args:
-        - APT_MIRROR=${APT_MIRROR:-}
-    container_name: WeKnora-wechat-article-reader
-    expose:
-      - "8080"
-    environment:
-      - TZ=${TZ:-Asia/Shanghai}
-      - DOCREADER_SERVE_HTTP=true
-      - DOCREADER_HTTP_PORT=8080
-      - DOCREADER_WEB_BROWSER=${DOCREADER_WEB_BROWSER:-chromium}
-      - DOCREADER_WEB_BROWSER_CHANNEL=${DOCREADER_WEB_BROWSER_CHANNEL:-}
-      - DOCREADER_WEB_BROWSER_EXECUTABLE_PATH=${DOCREADER_WEB_BROWSER_EXECUTABLE_PATH:-}
-      - DOCREADER_EXTERNAL_HTTP_PROXY=${DOCREADER_EXTERNAL_HTTP_PROXY:-}
-      - DOCREADER_EXTERNAL_HTTPS_PROXY=${DOCREADER_EXTERNAL_HTTPS_PROXY:-}
-      - DOCREADER_WECHAT_REDFOX_ENABLED=${DOCREADER_WECHAT_REDFOX_ENABLED:-true}
-      - REDFOX_API_KEY=${REDFOX_API_KEY:-}
-      - REDFOX_BASE_URL=${REDFOX_BASE_URL:-https://redfox.hk}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     networks:
       - WeKnora-network
     restart: unless-stopped
@@ -304,9 +264,9 @@ services:
       - DOCREADER_WEB_BROWSER=${DOCREADER_WEB_BROWSER:-chromium}
       - DOCREADER_WEB_BROWSER_CHANNEL=${DOCREADER_WEB_BROWSER_CHANNEL:-}
       - DOCREADER_WEB_BROWSER_EXECUTABLE_PATH=${DOCREADER_WEB_BROWSER_EXECUTABLE_PATH:-}
-      - DOCREADER_WECHAT_REDFOX_ENABLED=${DOCREADER_WECHAT_REDFOX_ENABLED:-true}
-      - REDFOX_API_KEY=${REDFOX_API_KEY:-}
-      - REDFOX_BASE_URL=${REDFOX_BASE_URL:-https://redfox.hk}
+      - DAJIALA_API_KEY=${DAJIALA_API_KEY:-}
+      - DAJIALA_VERIFYCODE=${DAJIALA_VERIFYCODE:-}
+      - DAJIALA_BASE_URL=${DAJIALA_BASE_URL:-https://www.dajiala.com}
       - DOCREADER_PDF_RENDER_MAX_WORKERS=${DOCREADER_PDF_RENDER_MAX_WORKERS:-1}
       - DOCREADER_PDF_RENDER_DPI=${DOCREADER_PDF_RENDER_DPI:-200}
       - DOCREADER_PDF_JPEG_QUALITY=${DOCREADER_PDF_JPEG_QUALITY:-90}

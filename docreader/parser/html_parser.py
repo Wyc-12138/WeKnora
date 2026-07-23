@@ -5,9 +5,6 @@ from docreader.parser.base_parser import BaseParser
 from docreader.parser.web_parser import (
     build_visible_text_fallback,
     extract_markdown_from_html,
-    extract_wechat_article_document,
-    has_wechat_article_root,
-    is_wechat_article_url,
     page_title_from_html,
     redact_url_for_log,
     visible_text_from_html,
@@ -32,17 +29,6 @@ class HTMLParser(BaseParser):
             self.title,
             len(html),
         )
-
-        if is_wechat_article_url(self.base_url) or has_wechat_article_root(html):
-            doc = extract_wechat_article_document(
-                html,
-                self.base_url,
-                fallback_title=self.title,
-                download_images=False,
-            )
-            if doc is not None:
-                doc.metadata["html_snapshot"] = "true"
-                return doc
 
         markdown = extract_markdown_from_html(html)
         page_title = page_title_from_html(html) or self.title

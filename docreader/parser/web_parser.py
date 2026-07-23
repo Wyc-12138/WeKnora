@@ -1,20 +1,14 @@
 import asyncio
-import base64
-import hashlib
-import html as html_lib
 import logging
-import mimetypes
 import re
 from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import requests
-from bs4 import BeautifulSoup, Comment
-from lxml.etree import XPath
-from markdownify import markdownify
+from bs4 import BeautifulSoup
 from playwright.async_api import Page, async_playwright
-from trafilatura import extract, utils, xpaths
+from trafilatura import extract
 
 from docreader.config import CONFIG
 from docreader.models.document import Document
@@ -23,6 +17,7 @@ from docreader.parser.chain_parser import PipelineParser
 from docreader.parser.markdown_parser import MarkdownParser
 from docreader.utils import endecode
 from docreader.utils.browser_crawler import BrowserCrawlConfig, fetch_one
+from docreader.utils.dajiala_provider import fetch_dajiala_article_with_diagnostics
 from docreader.utils.ssrf import is_ssrf_safe_url
 
 logger = logging.getLogger(__name__)
@@ -37,16 +32,7 @@ _MIN_FALLBACK_TEXT_LEN = 50
 _DIRECT_FETCH_TIMEOUT = (5, 20)
 _DIRECT_FETCH_REDIRECT_LIMIT = 5
 _DIRECT_FETCH_MAX_BYTES = 5 * 1024 * 1024
-_WECHAT_IMAGE_TIMEOUT = (5, 25)
-_WECHAT_IMAGE_MAX_BYTES = 20 * 1024 * 1024
-_WECHAT_IMAGE_REDIRECT_LIMIT = 5
-_WECHAT_MIN_ARTICLE_TEXT_LEN = 120
 _WECHAT_HOST = "mp.weixin.qq.com"
-_WECHAT_USER_AGENT = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "
-    "MicroMessenger/8.0.42 NetType/WIFI Language/zh_CN"
-)
 _BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -61,51 +47,6 @@ _SENSITIVE_QUERY_KEYS = {
     "token",
     "uin",
 }
-_WECHAT_BLOCK_MARKERS = (
-    "\u5f53\u524d\u73af\u5883\u5f02\u5e38",
-    "\u73af\u5883\u5f02\u5e38",
-    "\u5b8c\u6210\u9a8c\u8bc1",
-    "\u53bb\u9a8c\u8bc1",
-    "\u53c2\u6570\u9519\u8bef",
-    "\u9a8c\u8bc1\u7801",
-    "\u4eba\u673a\u9a8c\u8bc1",
-    "\u8bf7\u5728\u5fae\u4fe1\u5ba2\u6237\u7aef\u6253\u5f00",
-    "\u8bf7\u5728\u5ba2\u6237\u7aef\u6253\u5f00",
-    "\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41",
-    "\u5f53\u524d\u7f51\u7edc\u73af\u5883\u5b58\u5728\u5f02\u5e38",
-    "\u7cfb\u7edf\u6682\u65f6\u9650\u5236",
-    "\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u8d5e",
-    "\u8f7b\u70b9\u4e24\u4e0b\u53d6\u6d88\u5728\u770b",
-    "security verification",
-    "verify you are human",
-    "captcha",
-    "access denied",
-    "too many requests",
-)
-
-# Monkey-patch trafilatura internals to better support WeChat Official Account
-# articles, whose images live on `mmbiz.qpic.cn` without a standard file
-# extension and whose main content sits inside `#js_content` /
-# `.rich_media_content`. Trafilatura's `utils.IMAGE_EXTENSION` and
-# `xpaths.BODY_XPATH` are internal APIs, so we guard the patch and skip
-# silently if they are renamed/removed in a future release.
-try:
-    _WECHAT_IMAGE_EXTENSION = re.compile(
-        r"[^\s]+\.(avif|bmp|gif|hei[cf]|jpe?g|png|webp)(\b|$)|"  # Standard extensions
-        r"mmbiz\.qpic\.cn/[^\s]*wx_fmt=(jpeg|jpg|png|gif|webp)"  # WeChat query format
-    )
-    utils.IMAGE_EXTENSION = _WECHAT_IMAGE_EXTENSION
-
-    _WECHAT_BODY_XPATH = XPath(
-        '(.//*[@id="js_content" or contains(@class, "rich_media_content")])[1]'
-    )
-    _wechat_xpath_str = str(_WECHAT_BODY_XPATH)
-    if not any(str(x) == _wechat_xpath_str for x in xpaths.BODY_XPATH):
-        xpaths.BODY_XPATH.insert(0, _WECHAT_BODY_XPATH)
-except (AttributeError, ImportError) as e:
-    logger.warning(
-        "Failed to patch trafilatura internals for WeChat support: %s", e
-    )
 
 
 @dataclass(frozen=True)
@@ -143,20 +84,6 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
-def markdown_visible_len(markdown_text: str) -> int:
-    text = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", markdown_text or "")
-    text = re.sub(r"\[[^\]]*\]\([^)]+\)", "", text)
-    text = re.sub(r"[#>*_`|\\\-\[\]()]", "", text)
-    return len(re.sub(r"\s+", "", text))
-
-
-def is_wechat_blocked_content(text: str) -> bool:
-    normalized = normalize_text(text)
-    if not normalized:
-        return False
-    return any(marker in normalized for marker in _WECHAT_BLOCK_MARKERS)
-
-
 def page_title_from_html(html: str) -> str:
     soup = BeautifulSoup(html or "", "html.parser")
     if soup.title and soup.title.string:
@@ -167,11 +94,6 @@ def page_title_from_html(html: str) -> str:
 def visible_text_from_html(html: str) -> str:
     soup = BeautifulSoup(html or "", "html.parser")
     return soup.get_text("\n", strip=True)
-
-
-def has_wechat_article_root(html: str) -> bool:
-    soup = BeautifulSoup(html or "", "html.parser")
-    return bool(soup.select_one("#js_content") or soup.select_one(".rich_media_content"))
 
 
 def extract_markdown_from_html(html: str) -> Optional[str]:
@@ -200,288 +122,6 @@ def build_visible_text_fallback(visible_text: str, page_title: str = "") -> Opti
     if title and not text.startswith(title):
         return f"# {title}\n\n{text}"
     return text
-
-
-def _selector_text(soup: BeautifulSoup, selector: str) -> str:
-    node = soup.select_one(selector)
-    return normalize_text(node.get_text(" ", strip=True)) if node else ""
-
-
-def _meta_content(soup: BeautifulSoup, *names: str) -> str:
-    for name in names:
-        node = soup.find("meta", attrs={"property": name}) or soup.find(
-            "meta", attrs={"name": name}
-        )
-        if node and node.get("content"):
-            return normalize_text(str(node["content"]))
-    return ""
-
-
-def _clean_markdown(markdown_text: str) -> str:
-    text = html_lib.unescape(markdown_text or "")
-    text = re.sub(r"[ \t]+\n", "\n", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
-
-
-def _normalize_image_url(src: str, base_url: str) -> str:
-    if not src:
-        return ""
-    if src.startswith("//"):
-        return "https:" + src
-    return urljoin(base_url, src)
-
-
-def _configured_proxies() -> dict[str, str] | None:
-    proxies = {}
-    if CONFIG.external_http_proxy:
-        proxies["http"] = CONFIG.external_http_proxy
-    if CONFIG.external_https_proxy:
-        proxies["https"] = CONFIG.external_https_proxy
-    return proxies or None
-
-
-def _image_ext(image_url: str, content_type: str) -> str:
-    try:
-        parsed = urlparse(image_url)
-        query = dict(parse_qsl(parsed.query))
-        for key in ("wx_fmt", "tp"):
-            value = query.get(key, "").lower().replace("jpeg", "jpg")
-            if value in {"jpg", "png", "gif", "webp", "bmp"}:
-                return value
-    except Exception:
-        pass
-
-    mime_type = (content_type or "").split(";", 1)[0].strip().lower()
-    ext = mimetypes.guess_extension(mime_type) or ".jpg"
-    ext = ext.lstrip(".").replace("jpeg", "jpg")
-    return ext if ext in {"jpg", "png", "gif", "webp", "bmp"} else "jpg"
-
-
-def _download_wechat_image(session: requests.Session, image_url: str) -> tuple[bytes, str]:
-    current_url = image_url
-    response = None
-    for _ in range(_WECHAT_IMAGE_REDIRECT_LIMIT + 1):
-        safe, reason = is_ssrf_safe_url(current_url)
-        if not safe:
-            raise ValueError(f"image URL rejected: {reason}")
-
-        response = session.get(
-            current_url,
-            headers={
-                "User-Agent": _WECHAT_USER_AGENT,
-                "Referer": "https://mp.weixin.qq.com/",
-                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-            },
-            timeout=_WECHAT_IMAGE_TIMEOUT,
-            stream=True,
-            allow_redirects=False,
-            proxies=_configured_proxies(),
-        )
-        if response.is_redirect or response.is_permanent_redirect:
-            location = response.headers.get("Location", "")
-            response.close()
-            if not location:
-                raise ValueError("image redirect missing location")
-            current_url = urljoin(current_url, location)
-            continue
-        break
-    else:
-        raise ValueError("image exceeded redirect limit")
-
-    if response is None:
-        raise ValueError("image request failed before response")
-
-    try:
-        response.raise_for_status()
-        chunks: list[bytes] = []
-        total = 0
-        for chunk in response.iter_content(chunk_size=65536):
-            if not chunk:
-                continue
-            total += len(chunk)
-            if total > _WECHAT_IMAGE_MAX_BYTES:
-                raise ValueError("image exceeded max size")
-            chunks.append(chunk)
-        return b"".join(chunks), response.headers.get("Content-Type", "")
-    finally:
-        response.close()
-
-
-def _register_wechat_image(
-    *,
-    session: requests.Session,
-    image_url: str,
-    prefix: str,
-    seq: int,
-    seen_urls: dict[str, str],
-    images: dict[str, str],
-) -> str:
-    if image_url in seen_urls:
-        return seen_urls[image_url]
-
-    data, content_type = _download_wechat_image(session, image_url)
-    ext = _image_ext(image_url, content_type)
-    digest = hashlib.sha1(image_url.encode("utf-8")).hexdigest()[:8]
-    rel = f"images/{prefix}_{seq:03d}_{digest}.{ext}"
-    images[rel] = base64.b64encode(data).decode("ascii")
-    seen_urls[image_url] = rel
-    return rel
-
-
-def extract_wechat_article_document(
-    html: str,
-    url: str,
-    fallback_title: str = "",
-    download_images: bool = True,
-) -> Optional[Document]:
-    """Extract a WeChat Official Account article into markdown."""
-    soup = BeautifulSoup(html or "", "html.parser")
-    article = soup.select_one("#js_content") or soup.select_one(".rich_media_content")
-    if not article:
-        return None
-
-    title = (
-        _selector_text(soup, "#activity-name")
-        or _meta_content(soup, "og:title", "twitter:title")
-        or normalize_text(fallback_title)
-    )
-    account = _selector_text(soup, "#js_name")
-    author = _selector_text(soup, "#js_author_name") or _selector_text(soup, "#js_author")
-    publish_time = _selector_text(soup, "#publish_time")
-
-    for node in article.find_all(string=lambda text: isinstance(text, Comment)):
-        node.extract()
-    for node in article.find_all(["script", "style", "iframe", "svg"]):
-        node.decompose()
-    for selector in (
-        ".rich_media_tool",
-        ".qr_code_pc",
-        ".reward_area",
-        ".js_profile_qrcode",
-        ".share_notice",
-    ):
-        for node in article.select(selector):
-            node.decompose()
-
-    images: dict[str, str] = {}
-    seen_urls: dict[str, str] = {}
-    image_seq = 0
-    background_seq = 0
-    background_paths: list[str] = []
-    session = requests.Session()
-
-    for img in article.find_all("img"):
-        src = (
-            img.get("data-src")
-            or img.get("data-original")
-            or img.get("data-backsrc")
-            or img.get("src")
-            or ""
-        )
-        src = _normalize_image_url(src, url)
-        if src:
-            if not download_images:
-                img["src"] = src
-            else:
-                try:
-                    image_seq += 1
-                    img["src"] = _register_wechat_image(
-                        session=session,
-                        image_url=src,
-                        prefix="image",
-                        seq=image_seq,
-                        seen_urls=seen_urls,
-                        images=images,
-                    )
-                except Exception as exc:
-                    image_seq -= 1
-                    logger.warning("Failed to inline WeChat image %s: %s", src, exc)
-                    img["src"] = src
-        img["alt"] = normalize_text(img.get("alt") or img.get("data-w") or "")
-
-    for node in article.select("[style]"):
-        style = node.get("style") or ""
-        for match in re.findall(r"url\((.*?)\)", style):
-            bg_url = _normalize_image_url(match.strip("\"' "), url)
-            if not bg_url.startswith(("http://", "https://")):
-                continue
-            if not download_images:
-                background_paths.append(bg_url)
-            else:
-                try:
-                    background_seq += 1
-                    background_paths.append(
-                        _register_wechat_image(
-                            session=session,
-                            image_url=bg_url,
-                            prefix="background",
-                            seq=background_seq,
-                            seen_urls=seen_urls,
-                            images=images,
-                        )
-                    )
-                except Exception as exc:
-                    background_seq -= 1
-                    logger.warning("Failed to inline WeChat background image %s: %s", bg_url, exc)
-
-    body_md = markdownify(
-        str(article),
-        heading_style="ATX",
-        bullets="-",
-        strip=["span"],
-    )
-    body_md = _clean_markdown(body_md)
-    if not body_md:
-        return None
-
-    parts = []
-    if title:
-        parts.append(f"# {title}")
-    meta_line = " | ".join(
-        part for part in (account, author, publish_time) if part
-    )
-    if meta_line:
-        parts.append(meta_line)
-    parts.append(body_md)
-    if background_paths:
-        parts.append(
-            "## Saved Background Images\n\n"
-            + "\n\n".join(f"![background]({path})" for path in background_paths)
-        )
-    content = _clean_markdown("\n\n".join(parts))
-
-    if markdown_visible_len(content) < _WECHAT_MIN_ARTICLE_TEXT_LEN:
-        logger.warning(
-            "WeChat article extraction produced too little text: %d chars",
-            markdown_visible_len(content),
-        )
-        return None
-    if is_wechat_blocked_content(content):
-        logger.warning("WeChat article extraction matched block-page markers")
-        return None
-
-    metadata = {
-        "source": "wechat_official_account",
-        "source_url": url,
-    }
-    if title:
-        metadata["title"] = title
-    if account:
-        metadata["account"] = account
-    if author:
-        metadata["author"] = author
-    if publish_time:
-        metadata["publish_time"] = publish_time
-
-    if not download_images:
-        image_seq = len([img for img in article.find_all("img") if img.get("src")])
-        background_seq = len(background_paths)
-    metadata["inline_images"] = str(image_seq)
-    metadata["background_images"] = str(background_seq)
-    metadata["total_unique_images"] = str(len(images) if download_images else image_seq + background_seq)
-
-    return Document(content=content, images=images, metadata=metadata)
 
 
 async def wait_for_rendered_content(page: Page) -> None:
@@ -673,7 +313,7 @@ class StdWebParser(BaseParser):
             proxies["https"] = CONFIG.external_https_proxy
 
         headers = {
-            "User-Agent": _WECHAT_USER_AGENT if is_wechat_article_url(url) else (
+            "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
             ),
@@ -756,35 +396,26 @@ class StdWebParser(BaseParser):
 
         logger.info("Scraping web page: %s", redacted_url)
         if is_wechat_article_url(url):
-            direct = self.fetch_direct(url)
-            direct_has_article_root = has_wechat_article_root(direct.html)
-            direct_visible_len = len(normalize_text(direct.visible_text))
-            direct_blocked = is_wechat_blocked_content(direct.visible_text)
-            logger.info(
-                "Direct WeChat UA fetch diagnostics: html_len=%d visible_text_len=%d title=%r has_article_root=%s blocked_marker=%s",
-                len(direct.html),
-                direct_visible_len,
-                direct.page_title[:80] if direct.page_title else "",
-                direct_has_article_root,
-                direct_blocked,
-            )
-            direct_doc = extract_wechat_article_document(
-                direct.html,
+            doc, diag = fetch_dajiala_article_with_diagnostics(
                 url,
-                fallback_title=direct.page_title,
+                api_key=CONFIG.dajiala_api_key,
+                verifycode=CONFIG.dajiala_verifycode,
+                base_url=CONFIG.dajiala_base_url,
             )
-            if direct_doc is not None:
-                logger.info(
-                    "Parsed WeChat article via direct WeChat UA fetch: content_len=%d title=%r",
-                    len(direct_doc.content),
-                    direct_doc.metadata.get("title", ""),
-                )
-                return direct_doc
-            logger.error(
-                "Direct WeChat UA fetch did not return usable article content; url=%s text_head=%r",
-                redacted_url,
-                normalize_text(direct.visible_text)[:240],
+            logger.info(
+                "Dajiala WeChat article diagnostics: attempted=%s http_status=%s code=%s usable=%s title=%r html_len=%d markdown_len=%d error=%s",
+                diag.get("attempted"),
+                diag.get("http_status"),
+                diag.get("code"),
+                diag.get("usable"),
+                str(diag.get("title") or "")[:80],
+                diag.get("html_length"),
+                diag.get("markdown_length"),
+                diag.get("error"),
             )
+            if doc is not None:
+                return doc
+            logger.error("Dajiala did not return usable WeChat article content; url=%s", redacted_url)
             return Document()
 
         result = asyncio.run(
